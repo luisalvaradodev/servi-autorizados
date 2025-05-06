@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 
 const technicianSchema = z.object({
@@ -66,7 +66,17 @@ export default function TechnicianForm() {
   // Create mutation
   const createMutation = useMutation({
     mutationFn: (values: TechnicianFormValues) => {
-      return techniciansApi.create(values);
+      // Ensure name and specialty are required for the API
+      if (!values.name || !values.specialty) {
+        throw new Error("Nombre y especialidad son obligatorios");
+      }
+      return techniciansApi.create({
+        name: values.name,
+        specialty: values.specialty,
+        email: values.email || null,
+        phone: values.phone || null,
+        is_active: values.is_active
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["technicians"] });
@@ -77,7 +87,16 @@ export default function TechnicianForm() {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: (values: TechnicianFormValues) => {
-      return techniciansApi.update(id!, values);
+      if (!values.name || !values.specialty) {
+        throw new Error("Nombre y especialidad son obligatorios");
+      }
+      return techniciansApi.update(id!, {
+        name: values.name,
+        specialty: values.specialty,
+        email: values.email || null,
+        phone: values.phone || null,
+        is_active: values.is_active
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["technicians"] });
@@ -192,9 +211,9 @@ export default function TechnicianForm() {
                   <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
                       <FormLabel className="text-base">Estado activo</FormLabel>
-                      <FormDescription>
+                      <CardDescription>
                         Determina si el técnico está disponible para asignar a órdenes de servicio
-                      </FormDescription>
+                      </CardDescription>
                     </div>
                     <FormControl>
                       <Switch

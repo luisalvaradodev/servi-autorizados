@@ -132,7 +132,7 @@ export default function TechnicianList() {
                         {tech.phone && <div>{tech.phone}</div>}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={tech.is_active ? "success" : "destructive"}>
+                        <Badge variant={tech.is_active ? "default" : "destructive"}>
                           {tech.is_active ? "Activo" : "Inactivo"}
                         </Badge>
                       </TableCell>

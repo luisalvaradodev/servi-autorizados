@@ -1,7 +1,12 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Client, ApplianceType, Brand, ServiceOrder, ServicePart, ServiceLabor, Appointment, Technician } from "@/types";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
+
+// Helper to get toast outside components
+const toastMessage = (title: string, description: string, variant: "default" | "destructive" = "default") => {
+  // For server-side or non-component contexts
+  console.log(`${variant}: ${title} - ${description}`);
+};
 
 // Client API
 export const clientsApi = {
@@ -13,11 +18,7 @@ export const clientsApi = {
     
     if (error) {
       console.error('Error fetching clients:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los clientes",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudieron cargar los clientes", "destructive");
       return [];
     }
     
@@ -33,11 +34,7 @@ export const clientsApi = {
     
     if (error) {
       console.error('Error fetching client:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo cargar la información del cliente",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo cargar la información del cliente", "destructive");
       return null;
     }
     
@@ -47,11 +44,7 @@ export const clientsApi = {
   create: async (client: Omit<Client, 'id' | 'created_at' | 'updated_at'>): Promise<Client | null> => {
     // Make sure required fields exist and aren't undefined
     if (!client.name) {
-      toast({
-        title: "Error",
-        description: "El nombre del cliente es obligatorio",
-        variant: "destructive",
-      });
+      toastMessage("Error", "El nombre del cliente es obligatorio", "destructive");
       return null;
     }
     
@@ -63,18 +56,11 @@ export const clientsApi = {
     
     if (error) {
       console.error('Error creating client:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo crear el cliente",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo crear el cliente", "destructive");
       return null;
     }
     
-    toast({
-      title: "Éxito",
-      description: "Cliente creado correctamente",
-    });
+    toastMessage("Éxito", "Cliente creado correctamente");
     
     return data;
   },
@@ -82,11 +68,7 @@ export const clientsApi = {
   update: async (id: string, client: Partial<Client>): Promise<Client | null> => {
     // Make sure required fields exist and aren't undefined
     if (client.name === undefined || client.name === "") {
-      toast({
-        title: "Error",
-        description: "El nombre del cliente es obligatorio",
-        variant: "destructive",
-      });
+      toastMessage("Error", "El nombre del cliente es obligatorio", "destructive");
       return null;
     }
     
@@ -102,18 +84,11 @@ export const clientsApi = {
     
     if (error) {
       console.error('Error updating client:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el cliente",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo actualizar el cliente", "destructive");
       return null;
     }
     
-    toast({
-      title: "Éxito",
-      description: "Cliente actualizado correctamente",
-    });
+    toastMessage("Éxito", "Cliente actualizado correctamente");
     
     return data;
   },
@@ -126,18 +101,11 @@ export const clientsApi = {
     
     if (error) {
       console.error('Error deleting client:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el cliente",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo eliminar el cliente", "destructive");
       return false;
     }
     
-    toast({
-      title: "Éxito",
-      description: "Cliente eliminado correctamente",
-    });
+    toastMessage("Éxito", "Cliente eliminado correctamente");
     
     return true;
   }
@@ -168,18 +136,11 @@ export const applianceTypesApi = {
     
     if (error) {
       console.error('Error creating appliance type:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo crear el tipo de electrodoméstico",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo crear el tipo de electrodoméstico", "destructive");
       return null;
     }
     
-    toast({
-      title: "Éxito",
-      description: "Tipo de electrodoméstico creado correctamente",
-    });
+    toastMessage("Éxito", "Tipo de electrodoméstico creado correctamente");
     
     return data;
   },
@@ -192,18 +153,11 @@ export const applianceTypesApi = {
     
     if (error) {
       console.error('Error deleting appliance type:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el tipo de electrodoméstico",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo eliminar el tipo de electrodoméstico", "destructive");
       return false;
     }
     
-    toast({
-      title: "Éxito",
-      description: "Tipo de electrodoméstico eliminado correctamente",
-    });
+    toastMessage("Éxito", "Tipo de electrodoméstico eliminado correctamente");
     
     return true;
   }
@@ -234,18 +188,11 @@ export const brandsApi = {
     
     if (error) {
       console.error('Error creating brand:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo crear la marca",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo crear la marca", "destructive");
       return null;
     }
     
-    toast({
-      title: "Éxito",
-      description: "Marca creada correctamente",
-    });
+    toastMessage("Éxito", "Marca creada correctamente");
     
     return data;
   },
@@ -258,18 +205,11 @@ export const brandsApi = {
     
     if (error) {
       console.error('Error deleting brand:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar la marca",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo eliminar la marca", "destructive");
       return false;
     }
     
-    toast({
-      title: "Éxito",
-      description: "Marca eliminada correctamente",
-    });
+    toastMessage("Éxito", "Marca eliminada correctamente");
     
     return true;
   }
@@ -285,11 +225,7 @@ export const serviceOrdersApi = {
     
     if (error) {
       console.error('Error fetching service orders:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las órdenes de servicio",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudieron cargar las órdenes de servicio", "destructive");
       return [];
     }
     
@@ -305,11 +241,7 @@ export const serviceOrdersApi = {
     
     if (error) {
       console.error('Error fetching service order:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo cargar la información de la orden de servicio",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo cargar la información de la orden de servicio", "destructive");
       return null;
     }
     
@@ -319,11 +251,7 @@ export const serviceOrdersApi = {
   create: async (order: Omit<ServiceOrder, 'id' | 'order_number' | 'created_at' | 'updated_at'>): Promise<ServiceOrder | null> => {
     // Validate required fields
     if (!order.client_id || !order.appliance_type || !order.brand_id || !order.problem_description || !order.service_type || !order.urgency || !order.status) {
-      toast({
-        title: "Error",
-        description: "Faltan campos obligatorios",
-        variant: "destructive",
-      });
+      toastMessage("Error", "Faltan campos obligatorios", "destructive");
       return null;
     }
     
@@ -335,18 +263,11 @@ export const serviceOrdersApi = {
     
     if (error) {
       console.error('Error creating service order:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo crear la orden de servicio",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo crear la orden de servicio", "destructive");
       return null;
     }
     
-    toast({
-      title: "Éxito",
-      description: "Orden de servicio creada correctamente",
-    });
+    toastMessage("Éxito", "Orden de servicio creada correctamente");
     
     return data;
   },
@@ -364,18 +285,11 @@ export const serviceOrdersApi = {
     
     if (error) {
       console.error('Error updating service order:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar la orden de servicio",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo actualizar la orden de servicio", "destructive");
       return null;
     }
     
-    toast({
-      title: "Éxito",
-      description: "Orden de servicio actualizada correctamente",
-    });
+    toastMessage("Éxito", "Orden de servicio actualizada correctamente");
     
     return data;
   },
@@ -388,18 +302,11 @@ export const serviceOrdersApi = {
     
     if (error) {
       console.error('Error deleting service order:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar la orden de servicio",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo eliminar la orden de servicio", "destructive");
       return false;
     }
     
-    toast({
-      title: "Éxito",
-      description: "Orden de servicio eliminada correctamente",
-    });
+    toastMessage("Éxito", "Orden de servicio eliminada correctamente");
     
     return true;
   },
@@ -427,11 +334,7 @@ export const serviceOrdersApi = {
     
     if (error) {
       console.error('Error adding service part:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo agregar el repuesto",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo agregar el repuesto", "destructive");
       return null;
     }
     
@@ -475,11 +378,7 @@ export const serviceOrdersApi = {
     
     if (error) {
       console.error('Error adding service labor:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo agregar el trabajo",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo agregar el trabajo", "destructive");
       return null;
     }
     
@@ -511,11 +410,7 @@ export const appointmentsApi = {
     
     if (error) {
       console.error('Error fetching appointments:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las citas",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudieron cargar las citas", "destructive");
       return [];
     }
     
@@ -546,18 +441,11 @@ export const appointmentsApi = {
     
     if (error) {
       console.error('Error creating appointment:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo crear la cita",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo crear la cita", "destructive");
       return null;
     }
     
-    toast({
-      title: "Éxito",
-      description: "Cita creada correctamente",
-    });
+    toastMessage("Éxito", "Cita creada correctamente");
     
     return data;
   },
@@ -575,18 +463,11 @@ export const appointmentsApi = {
     
     if (error) {
       console.error('Error updating appointment:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar la cita",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo actualizar la cita", "destructive");
       return null;
     }
     
-    toast({
-      title: "Éxito",
-      description: "Cita actualizada correctamente",
-    });
+    toastMessage("Éxito", "Cita actualizada correctamente");
     
     return data;
   },
@@ -599,18 +480,11 @@ export const appointmentsApi = {
     
     if (error) {
       console.error('Error deleting appointment:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar la cita",
-        variant: "destructive",
-      });
+      toastMessage("Error", "No se pudo eliminar la cita", "destructive");
       return false;
     }
     
-    toast({
-      title: "Éxito",
-      description: "Cita eliminada correctamente",
-    });
+    toastMessage("Éxito", "Cita eliminada correctamente");
     
     return true;
   }
@@ -619,125 +493,124 @@ export const appointmentsApi = {
 // Technicians API
 export const techniciansApi = {
   getAll: async (): Promise<Technician[]> => {
-    const { data, error } = await supabase
-      .from('technicians')
-      .select('*')
-      .order('name');
-    
-    if (error) {
-      console.error('Error fetching technicians:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los técnicos",
-        variant: "destructive",
-      });
+    try {
+      const { data, error } = await supabase
+        .from('technicians')
+        .select('*')
+        .order('name');
+      
+      if (error) {
+        console.error('Error fetching technicians:', error);
+        toastMessage("Error", "No se pudieron cargar los técnicos", "destructive");
+        return [];
+      }
+      
+      return data as Technician[] || [];
+    } catch (error) {
+      console.error('Error in technicians getAll:', error);
       return [];
     }
-    
-    return data || [];
   },
   
   getById: async (id: string): Promise<Technician | null> => {
-    const { data, error } = await supabase
-      .from('technicians')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (error) {
-      console.error('Error fetching technician:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo cargar la información del técnico",
-        variant: "destructive",
-      });
+    try {
+      const { data, error } = await supabase
+        .from('technicians')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching technician:', error);
+        toastMessage("Error", "No se pudo cargar la información del técnico", "destructive");
+        return null;
+      }
+      
+      return data as Technician;
+    } catch (error) {
+      console.error('Error in technician getById:', error);
       return null;
     }
-    
-    return data;
   },
   
   create: async (technician: Omit<Technician, 'id' | 'created_at'>): Promise<Technician | null> => {
-    if (!technician.name || !technician.specialty) {
-      toast({
-        title: "Error",
-        description: "El nombre y la especialidad son obligatorios",
-        variant: "destructive",
-      });
+    try {
+      if (!technician.name || !technician.specialty) {
+        toastMessage("Error", "El nombre y la especialidad son obligatorios", "destructive");
+        return null;
+      }
+      
+      const { data, error } = await supabase
+        .from('technicians')
+        .insert([technician])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Error creating technician:', error);
+        toastMessage("Error", "No se pudo crear el técnico", "destructive");
+        return null;
+      }
+      
+      toastMessage("Éxito", "Técnico creado correctamente");
+      
+      return data as Technician;
+    } catch (error) {
+      console.error('Error in technician create:', error);
       return null;
     }
-    
-    const { data, error } = await supabase
-      .from('technicians')
-      .insert([technician])
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('Error creating technician:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo crear el técnico",
-        variant: "destructive",
-      });
-      return null;
-    }
-    
-    toast({
-      title: "Éxito",
-      description: "Técnico creado correctamente",
-    });
-    
-    return data;
   },
   
   update: async (id: string, technician: Partial<Technician>): Promise<Technician | null> => {
-    const { data, error } = await supabase
-      .from('technicians')
-      .update(technician)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('Error updating technician:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el técnico",
-        variant: "destructive",
-      });
+    try {
+      // Ensure name and specialty are present if they're being updated
+      if ((technician.name !== undefined && !technician.name) || 
+          (technician.specialty !== undefined && !technician.specialty)) {
+        toastMessage("Error", "El nombre y la especialidad son obligatorios", "destructive");
+        return null;
+      }
+      
+      const { data, error } = await supabase
+        .from('technicians')
+        .update(technician)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Error updating technician:', error);
+        toastMessage("Error", "No se pudo actualizar el técnico", "destructive");
+        return null;
+      }
+      
+      toastMessage("Éxito", "Técnico actualizado correctamente");
+      
+      return data as Technician;
+    } catch (error) {
+      console.error('Error in technician update:', error);
       return null;
     }
-    
-    toast({
-      title: "Éxito",
-      description: "Técnico actualizado correctamente",
-    });
-    
-    return data;
   },
   
   delete: async (id: string): Promise<boolean> => {
-    const { error } = await supabase
-      .from('technicians')
-      .delete()
-      .eq('id', id);
-    
-    if (error) {
-      console.error('Error deleting technician:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el técnico",
-        variant: "destructive",
-      });
+    try {
+      const { error } = await supabase
+        .from('technicians')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Error deleting technician:', error);
+        toastMessage("Error", "No se pudo eliminar el técnico", "destructive");
+        return false;
+      }
+      
+      toastMessage("Éxito", "Técnico eliminado correctamente");
+      
+      return true;
+    } catch (error) {
+      console.error('Error in technician delete:', error);
       return false;
     }
-    
-    toast({
-      title: "Éxito",
-      description: "Técnico eliminado correctamente",
-    });
-    
-    return true;
   }
 };
