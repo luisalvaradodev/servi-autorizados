@@ -38,7 +38,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   </p>
                 )}
               </div>
-              <SidebarTrigger asChild>
+              <SidebarTrigger>
                 <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setIsCollapsed(!isCollapsed)}>
                   {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
                 </Button>
