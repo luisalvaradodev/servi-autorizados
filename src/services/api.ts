@@ -1,5 +1,6 @@
+
 import { supabase } from "@/integrations/supabase/client";
-import { Client, ApplianceType, Brand, ServiceOrder, ServicePart, ServiceLabor, Appointment } from "@/types";
+import { Client, ApplianceType, Brand, ServiceOrder, ServicePart, ServiceLabor, Appointment, Technician } from "@/types";
 import { toast } from "@/hooks/use-toast";
 
 // Client API
@@ -44,6 +45,16 @@ export const clientsApi = {
   },
   
   create: async (client: Omit<Client, 'id' | 'created_at' | 'updated_at'>): Promise<Client | null> => {
+    // Make sure required fields exist and aren't undefined
+    if (!client.name) {
+      toast({
+        title: "Error",
+        description: "El nombre del cliente es obligatorio",
+        variant: "destructive",
+      });
+      return null;
+    }
+    
     const { data, error } = await supabase
       .from('clients')
       .insert([client])
@@ -69,6 +80,16 @@ export const clientsApi = {
   },
   
   update: async (id: string, client: Partial<Client>): Promise<Client | null> => {
+    // Make sure required fields exist and aren't undefined
+    if (client.name === undefined || client.name === "") {
+      toast({
+        title: "Error",
+        description: "El nombre del cliente es obligatorio",
+        variant: "destructive",
+      });
+      return null;
+    }
+    
     const { data, error } = await supabase
       .from('clients')
       .update({
@@ -137,6 +158,55 @@ export const applianceTypesApi = {
     
     return data || [];
   },
+  
+  create: async (applianceType: { name: string }): Promise<ApplianceType | null> => {
+    const { data, error } = await supabase
+      .from('appliance_types')
+      .insert([applianceType])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating appliance type:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear el tipo de electrodoméstico",
+        variant: "destructive",
+      });
+      return null;
+    }
+    
+    toast({
+      title: "Éxito",
+      description: "Tipo de electrodoméstico creado correctamente",
+    });
+    
+    return data;
+  },
+  
+  delete: async (id: string): Promise<boolean> => {
+    const { error } = await supabase
+      .from('appliance_types')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error deleting appliance type:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el tipo de electrodoméstico",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    toast({
+      title: "Éxito",
+      description: "Tipo de electrodoméstico eliminado correctamente",
+    });
+    
+    return true;
+  }
 };
 
 // Brands API
@@ -154,6 +224,55 @@ export const brandsApi = {
     
     return data || [];
   },
+  
+  create: async (brand: { name: string }): Promise<Brand | null> => {
+    const { data, error } = await supabase
+      .from('brands')
+      .insert([brand])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating brand:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear la marca",
+        variant: "destructive",
+      });
+      return null;
+    }
+    
+    toast({
+      title: "Éxito",
+      description: "Marca creada correctamente",
+    });
+    
+    return data;
+  },
+  
+  delete: async (id: string): Promise<boolean> => {
+    const { error } = await supabase
+      .from('brands')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error deleting brand:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la marca",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    toast({
+      title: "Éxito",
+      description: "Marca eliminada correctamente",
+    });
+    
+    return true;
+  }
 };
 
 // Service Orders API
@@ -198,6 +317,16 @@ export const serviceOrdersApi = {
   },
   
   create: async (order: Omit<ServiceOrder, 'id' | 'order_number' | 'created_at' | 'updated_at'>): Promise<ServiceOrder | null> => {
+    // Validate required fields
+    if (!order.client_id || !order.appliance_type || !order.brand_id || !order.problem_description || !order.service_type || !order.urgency || !order.status) {
+      toast({
+        title: "Error",
+        description: "Faltan campos obligatorios",
+        variant: "destructive",
+      });
+      return null;
+    }
+    
     const { data, error } = await supabase
       .from('service_orders')
       .insert([{ ...order, order_number: null }]) // Trigger will generate order_number
@@ -481,6 +610,132 @@ export const appointmentsApi = {
     toast({
       title: "Éxito",
       description: "Cita eliminada correctamente",
+    });
+    
+    return true;
+  }
+};
+
+// Technicians API
+export const techniciansApi = {
+  getAll: async (): Promise<Technician[]> => {
+    const { data, error } = await supabase
+      .from('technicians')
+      .select('*')
+      .order('name');
+    
+    if (error) {
+      console.error('Error fetching technicians:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los técnicos",
+        variant: "destructive",
+      });
+      return [];
+    }
+    
+    return data || [];
+  },
+  
+  getById: async (id: string): Promise<Technician | null> => {
+    const { data, error } = await supabase
+      .from('technicians')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching technician:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cargar la información del técnico",
+        variant: "destructive",
+      });
+      return null;
+    }
+    
+    return data;
+  },
+  
+  create: async (technician: Omit<Technician, 'id' | 'created_at'>): Promise<Technician | null> => {
+    if (!technician.name || !technician.specialty) {
+      toast({
+        title: "Error",
+        description: "El nombre y la especialidad son obligatorios",
+        variant: "destructive",
+      });
+      return null;
+    }
+    
+    const { data, error } = await supabase
+      .from('technicians')
+      .insert([technician])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating technician:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear el técnico",
+        variant: "destructive",
+      });
+      return null;
+    }
+    
+    toast({
+      title: "Éxito",
+      description: "Técnico creado correctamente",
+    });
+    
+    return data;
+  },
+  
+  update: async (id: string, technician: Partial<Technician>): Promise<Technician | null> => {
+    const { data, error } = await supabase
+      .from('technicians')
+      .update(technician)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating technician:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el técnico",
+        variant: "destructive",
+      });
+      return null;
+    }
+    
+    toast({
+      title: "Éxito",
+      description: "Técnico actualizado correctamente",
+    });
+    
+    return data;
+  },
+  
+  delete: async (id: string): Promise<boolean> => {
+    const { error } = await supabase
+      .from('technicians')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error deleting technician:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el técnico",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    toast({
+      title: "Éxito",
+      description: "Técnico eliminado correctamente",
     });
     
     return true;

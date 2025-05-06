@@ -1,34 +1,86 @@
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const { toast } = useToast();
+  const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Aquí integraremos Supabase más adelante
-    // Por ahora, simulamos un inicio de sesión exitoso
-    setTimeout(() => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) throw error;
+      
       toast({
         title: "Inicio de sesión exitoso",
         description: "Bienvenido al sistema",
       });
       
-      // Redireccionar al dashboard
-      window.location.href = "/dashboard";
-      
+      navigate("/dashboard");
+    } catch (error: any) {
+      toast({
+        title: "Error al iniciar sesión",
+        description: error.message || "Credenciales inválidas",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Registro exitoso",
+        description: "Se ha creado tu cuenta. Por favor verifica tu correo electrónico.",
+      });
+      
+      // Automatically sign in after registration
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (!signInError) {
+        navigate("/dashboard");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error al registrarse",
+        description: error.message || "No se pudo crear la cuenta",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -43,12 +95,19 @@ export default function Login() {
         
         <Card>
           <CardHeader>
-            <CardTitle>Iniciar sesión</CardTitle>
-            <CardDescription>
-              Ingresa tus credenciales para acceder al sistema
+            <Tabs value={authMode} onValueChange={(v) => setAuthMode(v as "login" | "register")}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="login">Iniciar sesión</TabsTrigger>
+                <TabsTrigger value="register">Registrarse</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <CardDescription className="mt-2">
+              {authMode === "login" 
+                ? "Ingresa tus credenciales para acceder al sistema" 
+                : "Crea una cuenta nueva para acceder al sistema"}
             </CardDescription>
           </CardHeader>
-          <form onSubmit={handleLogin}>
+          <form onSubmit={authMode === "login" ? handleLogin : handleRegister}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Correo electrónico</Label>
@@ -64,12 +123,14 @@ export default function Login() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Contraseña</Label>
-                  <a
-                    href="#"
-                    className="text-sm text-notion-blue hover:underline"
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </a>
+                  {authMode === "login" && (
+                    <a
+                      href="#"
+                      className="text-sm text-notion-blue hover:underline"
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </a>
+                  )}
                 </div>
                 <Input
                   id="password"
@@ -86,7 +147,9 @@ export default function Login() {
                 className="w-full notion-button"
                 disabled={isLoading}
               >
-                {isLoading ? "Iniciando sesión..." : "Iniciar sesión"}
+                {isLoading 
+                  ? (authMode === "login" ? "Iniciando sesión..." : "Registrando...") 
+                  : (authMode === "login" ? "Iniciar sesión" : "Registrarse")}
               </Button>
             </CardFooter>
           </form>

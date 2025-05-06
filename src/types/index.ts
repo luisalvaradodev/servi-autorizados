@@ -65,3 +65,13 @@ export interface Appointment {
   created_at: string;
   updated_at: string;
 }
+
+export interface Technician {
+  id: string;
+  name: string;
+  specialty: string;
+  phone: string | null;
+  email: string | null;
+  is_active: boolean;
+  created_at: string;
+}

@@ -1,52 +1,116 @@
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { serviceOrdersApi, clientsApi, applianceTypesApi, brandsApi } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Printer } from "lucide-react";
-
-// Datos simulados de la orden para imprimir
-const orderData = {
-  id: "OS-2023-042",
-  date: "15/05/2023",
-  status: "En proceso",
-  client: {
-    name: "María Rodríguez",
-    phone: "555-123-4567",
-    email: "maria.rodriguez@ejemplo.com",
-    address: "Av. Independencia 1234, Col. Centro, Ciudad de México, CP 12345",
-  },
-  appliance: {
-    type: "Refrigerador",
-    brand: "Samsung",
-    model: "RT38K5982BS",
-    serialNumber: "SN12345678",
-    problem: "No enfría correctamente, emite sonidos fuertes y la puerta no sella bien.",
-  },
-  service: {
-    type: "domicilio",
-    urgency: "normal",
-    observations: "Cliente menciona que el problema comenzó hace aproximadamente 2 semanas. Ya intentó desconectarlo y volverlo a conectar sin éxito.",
-    technician: "Carlos Méndez",
-  },
-  companyInfo: {
-    name: "ServiceScribe",
-    address: "Av. Tecnología 567, Col. Industrial",
-    city: "Ciudad de México, CP 54321",
-    phone: "555-987-6543",
-    email: "contacto@servicescribe.com",
-    website: "www.servicescribe.com",
-  },
-};
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 export default function OrderPrint() {
   const { id } = useParams();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
+  const [totalParts, setTotalParts] = useState(0);
+  const [totalLabor, setTotalLabor] = useState(0);
+  const [subtotal, setSubtotal] = useState(0);
+  const [iva, setIva] = useState(0);
+  const [total, setTotal] = useState(0);
+  
+  // Fetch order data
+  const { data: order, isLoading: isLoadingOrder } = useQuery({
+    queryKey: ["order", id],
+    queryFn: () => serviceOrdersApi.getById(id!),
+    enabled: !!id,
+  });
+  
+  // Fetch client data
+  const { data: client, isLoading: isLoadingClient } = useQuery({
+    queryKey: ["client", order?.client_id],
+    queryFn: () => clientsApi.getById(order!.client_id),
+    enabled: !!order?.client_id,
+  });
+  
+  // Fetch appliance type
+  const { data: applianceTypes, isLoading: isLoadingApplianceTypes } = useQuery({
+    queryKey: ["applianceTypes"],
+    queryFn: applianceTypesApi.getAll,
+  });
+  
+  // Fetch brand
+  const { data: brands, isLoading: isLoadingBrands } = useQuery({
+    queryKey: ["brands"],
+    queryFn: brandsApi.getAll,
+  });
+  
+  // Fetch service parts
+  const { data: serviceParts = [], isLoading: isLoadingServiceParts } = useQuery({
+    queryKey: ["serviceParts", id],
+    queryFn: () => serviceOrdersApi.getServiceParts(id!),
+    enabled: !!id,
+  });
+  
+  // Fetch service labor
+  const { data: serviceLabor = [], isLoading: isLoadingServiceLabor } = useQuery({
+    queryKey: ["serviceLabor", id],
+    queryFn: () => serviceOrdersApi.getServiceLabor(id!),
+    enabled: !!id,
+  });
+  
+  // Calculate totals
+  useEffect(() => {
+    if (serviceParts.length > 0 || serviceLabor.length > 0) {
+      const partsTotal = serviceParts.reduce(
+        (sum, part) => sum + part.unit_price * part.quantity, 
+        0
+      );
+      
+      const laborTotal = serviceLabor.reduce(
+        (sum, labor) => sum + labor.rate * labor.hours, 
+        0
+      );
+      
+      const calculatedSubtotal = partsTotal + laborTotal;
+      const calculatedIva = calculatedSubtotal * 0.16; // 16% IVA
+      const calculatedTotal = calculatedSubtotal + calculatedIva;
+      
+      setTotalParts(partsTotal);
+      setTotalLabor(laborTotal);
+      setSubtotal(calculatedSubtotal);
+      setIva(calculatedIva);
+      setTotal(calculatedTotal);
+    }
+  }, [serviceParts, serviceLabor]);
+  
+  // Helper to get appliance type name
+  const getApplianceTypeName = (id: string) => {
+    if (!applianceTypes) return "Desconocido";
+    const type = applianceTypes.find(t => t.id === id);
+    return type ? type.name : "Desconocido";
+  };
+  
+  // Helper to get brand name
+  const getBrandName = (id: string) => {
+    if (!brands) return "Desconocida";
+    const brand = brands.find(b => b.id === id);
+    return brand ? brand.name : "Desconocida";
+  };
   
   const handlePrint = () => {
     window.print();
   };
+  
+  const isLoading = isLoadingOrder || isLoadingClient || isLoadingApplianceTypes || isLoadingBrands;
+  
+  if (isLoading) {
+    return <div className="flex justify-center p-8">Cargando datos de la orden...</div>;
+  }
+  
+  if (!order || !client) {
+    return <div className="flex justify-center p-8">No se encontró la orden de servicio</div>;
+  }
   
   return (
     <div className="min-h-screen bg-gray-100 p-4 md:p-8">
@@ -75,17 +139,19 @@ export default function OrderPrint() {
           <div className="flex justify-between items-start">
             <div>
               <h1 className="text-2xl font-bold text-notion-blue">
-                {orderData.companyInfo.name}
+                ServiceScribe
               </h1>
-              <p className="text-sm text-notion-gray">{orderData.companyInfo.address}</p>
-              <p className="text-sm text-notion-gray">{orderData.companyInfo.city}</p>
-              <p className="text-sm text-notion-gray">Tel: {orderData.companyInfo.phone}</p>
-              <p className="text-sm text-notion-gray">{orderData.companyInfo.email}</p>
+              <p className="text-sm text-notion-gray">Av. Tecnología 567, Col. Industrial</p>
+              <p className="text-sm text-notion-gray">Ciudad de México, CP 54321</p>
+              <p className="text-sm text-notion-gray">Tel: 555-987-6543</p>
+              <p className="text-sm text-notion-gray">contacto@servicescribe.com</p>
             </div>
             <div className="text-right">
               <h2 className="text-xl font-bold">Orden de Servicio</h2>
-              <p className="text-lg font-semibold text-notion-blue">{orderData.id}</p>
-              <p className="text-sm text-notion-gray">Fecha: {orderData.date}</p>
+              <p className="text-lg font-semibold text-notion-blue">{order.order_number}</p>
+              <p className="text-sm text-notion-gray">
+                Fecha: {format(new Date(order.created_at), "dd/MM/yyyy", { locale: es })}
+              </p>
             </div>
           </div>
           
@@ -96,12 +162,12 @@ export default function OrderPrint() {
             <h3 className="text-lg font-semibold mb-2">Información del Cliente</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p><span className="font-medium">Nombre:</span> {orderData.client.name}</p>
-                <p><span className="font-medium">Teléfono:</span> {orderData.client.phone}</p>
-                <p><span className="font-medium">Email:</span> {orderData.client.email}</p>
+                <p><span className="font-medium">Nombre:</span> {client.name}</p>
+                <p><span className="font-medium">Teléfono:</span> {client.phone || "No disponible"}</p>
+                <p><span className="font-medium">Email:</span> {client.email || "No disponible"}</p>
               </div>
               <div>
-                <p><span className="font-medium">Dirección:</span> {orderData.client.address}</p>
+                <p><span className="font-medium">Dirección:</span> {client.address || "No disponible"}</p>
               </div>
             </div>
           </div>
@@ -111,13 +177,14 @@ export default function OrderPrint() {
             <h3 className="text-lg font-semibold mb-2">Datos del Electrodoméstico</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p><span className="font-medium">Tipo:</span> {orderData.appliance.type}</p>
-                <p><span className="font-medium">Marca:</span> {orderData.appliance.brand}</p>
-                <p><span className="font-medium">Modelo:</span> {orderData.appliance.model}</p>
+                <p><span className="font-medium">Tipo:</span> {getApplianceTypeName(order.appliance_type)}</p>
+                <p><span className="font-medium">Marca:</span> {getBrandName(order.brand_id)}</p>
+                <p><span className="font-medium">Modelo:</span> {order.model || "No disponible"}</p>
               </div>
               <div>
-                <p><span className="font-medium">N° Serie:</span> {orderData.appliance.serialNumber}</p>
-                <p><span className="font-medium">Técnico asignado:</span> {orderData.service.technician}</p>
+                <p><span className="font-medium">N° Serie:</span> {order.serial_number || "No disponible"}</p>
+                <p><span className="font-medium">Tipo de servicio:</span> {order.service_type}</p>
+                <p><span className="font-medium">Estado:</span> {order.status}</p>
               </div>
             </div>
           </div>
@@ -125,20 +192,28 @@ export default function OrderPrint() {
           {/* Problema reportado */}
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-2">Problema Reportado</h3>
-            <p className="border p-3 rounded-md">{orderData.appliance.problem}</p>
+            <p className="border p-3 rounded-md">{order.problem_description}</p>
           </div>
           
           {/* Observaciones */}
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-2">Observaciones</h3>
-            <p className="border p-3 rounded-md">{orderData.service.observations}</p>
+            <p className="border p-3 rounded-md">{order.observations || "Sin observaciones adicionales"}</p>
           </div>
           
           {/* Recibido/Diagnóstico/Trabajo a realizar */}
           <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-2">Diagnóstico y Trabajo a Realizar</h3>
+            <h3 className="text-lg font-semibold mb-2">Diagnóstico y Trabajo Realizado</h3>
             <div className="h-24 border p-3 rounded-md">
-              {/* Espacio en blanco para llenar manualmente */}
+              {serviceLabor.length > 0 ? (
+                <ul className="list-disc list-inside">
+                  {serviceLabor.map((labor) => (
+                    <li key={labor.id}>{labor.description}</li>
+                  ))}
+                </ul>
+              ) : (
+                "Sin trabajos registrados"
+              )}
             </div>
           </div>
           
@@ -155,31 +230,52 @@ export default function OrderPrint() {
                 </tr>
               </thead>
               <tbody>
-                {/* Filas vacías para llenar manualmente */}
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-b h-8">
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
+                {serviceParts.length > 0 ? (
+                  serviceParts.map((part) => (
+                    <tr key={part.id} className="border-b">
+                      <td className="py-2">{part.description}</td>
+                      <td className="text-center py-2">{part.quantity}</td>
+                      <td className="text-right py-2">${part.unit_price.toFixed(2)}</td>
+                      <td className="text-right py-2">${(part.quantity * part.unit_price).toFixed(2)}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr className="border-b">
+                    <td colSpan={4} className="py-2 text-center">No hay repuestos registrados</td>
                   </tr>
-                ))}
+                )}
+                
+                {serviceLabor.length > 0 && (
+                  <>
+                    <tr className="border-b">
+                      <td colSpan={4} className="font-medium pt-4 pb-2">Mano de Obra</td>
+                    </tr>
+                    {serviceLabor.map((labor) => (
+                      <tr key={labor.id} className="border-b">
+                        <td className="py-2">{labor.description}</td>
+                        <td className="text-center py-2">{labor.hours} hrs</td>
+                        <td className="text-right py-2">${labor.rate.toFixed(2)}/hora</td>
+                        <td className="text-right py-2">${(labor.hours * labor.rate).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </>
+                )}
               </tbody>
               <tfoot>
                 <tr>
                   <td colSpan={2} className="py-2"></td>
                   <td className="text-right font-medium py-2">Subtotal:</td>
-                  <td className="border-b"></td>
+                  <td className="text-right py-2">${subtotal.toFixed(2)}</td>
                 </tr>
                 <tr>
                   <td colSpan={2}></td>
-                  <td className="text-right font-medium py-2">IVA:</td>
-                  <td className="border-b"></td>
+                  <td className="text-right font-medium py-2">IVA (16%):</td>
+                  <td className="text-right py-2">${iva.toFixed(2)}</td>
                 </tr>
                 <tr>
                   <td colSpan={2}></td>
                   <td className="text-right font-medium py-2">Total:</td>
-                  <td className="border-b"></td>
+                  <td className="text-right font-bold py-2">${total.toFixed(2)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -190,13 +286,13 @@ export default function OrderPrint() {
             <div className="text-center">
               <div className="border-t pt-2">
                 <p className="font-medium">Técnico</p>
-                <p className="text-sm">{orderData.service.technician}</p>
+                <p className="text-sm">______________________</p>
               </div>
             </div>
             <div className="text-center">
               <div className="border-t pt-2">
                 <p className="font-medium">Cliente</p>
-                <p className="text-sm">{orderData.client.name}</p>
+                <p className="text-sm">{client.name}</p>
               </div>
             </div>
           </div>
@@ -204,7 +300,7 @@ export default function OrderPrint() {
           {/* Pie de página */}
           <div className="mt-12 text-center text-sm text-notion-gray">
             <p>Gracias por confiar en nuestros servicios</p>
-            <p>{orderData.companyInfo.website} | {orderData.companyInfo.phone}</p>
+            <p>www.servicescribe.com | 555-987-6543</p>
           </div>
         </div>
       </div>

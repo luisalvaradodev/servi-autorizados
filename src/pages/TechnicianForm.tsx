@@ -2,10 +2,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi } from "@/services/api";
+import { techniciansApi } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Save } from "lucide-react";
@@ -14,88 +13,80 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Switch } from "@/components/ui/switch";
 
-const clientSchema = z.object({
+const technicianSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
+  specialty: z.string().min(2, "La especialidad es requerida"),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
   phone: z.string().optional().or(z.literal("")),
-  address: z.string().optional().or(z.literal("")),
+  is_active: z.boolean().default(true),
 });
 
-type ClientFormValues = z.infer<typeof clientSchema>;
+type TechnicianFormValues = z.infer<typeof technicianSchema>;
 
-export default function ClientForm() {
+export default function TechnicianForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isEditMode = !!id;
 
-  const form = useForm<ClientFormValues>({
-    resolver: zodResolver(clientSchema),
+  const form = useForm<TechnicianFormValues>({
+    resolver: zodResolver(technicianSchema),
     defaultValues: {
       name: "",
+      specialty: "",
       email: "",
       phone: "",
-      address: "",
+      is_active: true,
     },
   });
 
-  // Fetch client data if in edit mode
-  const { data: client, isLoading: isLoadingClient } = useQuery({
-    queryKey: ["client", id],
-    queryFn: () => clientsApi.getById(id!),
+  // Fetch technician data if in edit mode
+  const { data: technician, isLoading: isLoadingTechnician } = useQuery({
+    queryKey: ["technician", id],
+    queryFn: () => techniciansApi.getById(id!),
     enabled: isEditMode,
   });
 
-  // Set form values when client data is loaded
+  // Set form values when technician data is loaded
   useEffect(() => {
-    if (client) {
+    if (technician) {
       form.reset({
-        name: client.name,
-        email: client.email || "",
-        phone: client.phone || "",
-        address: client.address || "",
+        name: technician.name,
+        specialty: technician.specialty,
+        email: technician.email || "",
+        phone: technician.phone || "",
+        is_active: technician.is_active,
       });
     }
-  }, [client, form]);
+  }, [technician, form]);
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (values: ClientFormValues) => {
-      // Ensure name is treated as required
-      return clientsApi.create({
-        name: values.name, // This is required
-        email: values.email || null,
-        phone: values.phone || null,
-        address: values.address || null,
-      });
+    mutationFn: (values: TechnicianFormValues) => {
+      return techniciansApi.create(values);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clients"] });
-      navigate("/clients");
+      queryClient.invalidateQueries({ queryKey: ["technicians"] });
+      navigate("/technicians");
     },
   });
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: (values: ClientFormValues) => {
-      // Ensure name is treated as required
-      return clientsApi.update(id!, {
-        name: values.name, // This is required
-        email: values.email || null,
-        phone: values.phone || null,
-        address: values.address || null,
-      });
+    mutationFn: (values: TechnicianFormValues) => {
+      return techniciansApi.update(id!, values);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clients"] });
-      queryClient.invalidateQueries({ queryKey: ["client", id] });
-      navigate(`/clients/${id}`);
+      queryClient.invalidateQueries({ queryKey: ["technicians"] });
+      queryClient.invalidateQueries({ queryKey: ["technician", id] });
+      navigate("/technicians");
     },
   });
 
-  const onSubmit = (values: ClientFormValues) => {
+  const onSubmit = (values: TechnicianFormValues) => {
     if (isEditMode) {
       updateMutation.mutate(values);
     } else {
@@ -103,8 +94,8 @@ export default function ClientForm() {
     }
   };
 
-  if (isEditMode && isLoadingClient) {
-    return <div className="flex justify-center p-8">Cargando datos del cliente...</div>;
+  if (isEditMode && isLoadingTechnician) {
+    return <div className="flex justify-center p-8">Cargando datos del técnico...</div>;
   }
 
   return (
@@ -114,23 +105,23 @@ export default function ClientForm() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/clients")}
+            onClick={() => navigate("/technicians")}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="notion-heading">
-            {isEditMode ? "Editar Cliente" : "Nuevo Cliente"}
+            {isEditMode ? "Editar Técnico" : "Nuevo Técnico"}
           </h1>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>{isEditMode ? "Editar información del cliente" : "Registrar nuevo cliente"}</CardTitle>
+          <CardTitle>{isEditMode ? "Editar información del técnico" : "Registrar nuevo técnico"}</CardTitle>
           <CardDescription>
             {isEditMode
-              ? "Modifica los datos del cliente según sea necesario"
-              : "Completa el formulario para registrar un nuevo cliente"}
+              ? "Modifica los datos del técnico según sea necesario"
+              : "Completa el formulario para registrar un nuevo técnico"}
           </CardDescription>
         </CardHeader>
         <Form {...form}>
@@ -144,6 +135,20 @@ export default function ClientForm() {
                     <FormLabel>Nombre completo *</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="Nombre y apellidos" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="specialty"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Especialidad *</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Ej: Refrigeración, Lavadoras, etc." />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -182,18 +187,21 @@ export default function ClientForm() {
 
               <FormField
                 control={form.control}
-                name="address"
+                name="is_active"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Dirección</FormLabel>
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Estado activo</FormLabel>
+                      <FormDescription>
+                        Determina si el técnico está disponible para asignar a órdenes de servicio
+                      </FormDescription>
+                    </div>
                     <FormControl>
-                      <Textarea
-                        {...field}
-                        placeholder="Calle, número, colonia, ciudad, código postal"
-                        rows={3}
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
                       />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -202,7 +210,7 @@ export default function ClientForm() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate("/clients")}
+                onClick={() => navigate("/technicians")}
               >
                 Cancelar
               </Button>
@@ -213,7 +221,7 @@ export default function ClientForm() {
                 <Save className="mr-2 h-4 w-4" />
                 {createMutation.isPending || updateMutation.isPending
                   ? "Guardando..."
-                  : "Guardar Cliente"}
+                  : "Guardar Técnico"}
               </Button>
             </CardFooter>
           </form>
