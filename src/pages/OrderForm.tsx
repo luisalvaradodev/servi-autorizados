@@ -1,7 +1,8 @@
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import AppLayout from "@/components/AppLayout";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { clientsApi, applianceTypesApi, brandsApi, serviceOrdersApi } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,121 +23,162 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/components/ui/use-toast";
-import { ArrowLeft, Save, Plus, Trash } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, Save, Trash } from "lucide-react";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
-const applianceTypes = [
-  "Refrigerador",
-  "Lavadora",
-  "Secadora",
-  "Lavavajillas",
-  "Estufa",
-  "Horno",
-  "Microondas",
-  "Licuadora",
-  "Batidora",
-  "Cafetera",
-  "Otro",
-];
+const orderSchema = z.object({
+  client_id: z.string().min(1, "Debe seleccionar un cliente"),
+  appliance_type: z.string().min(1, "Debe seleccionar un tipo de electrodoméstico"),
+  brand_id: z.string().min(1, "Debe seleccionar una marca"),
+  model: z.string().optional(),
+  serial_number: z.string().optional(),
+  problem_description: z.string().min(10, "La descripción del problema debe tener al menos 10 caracteres"),
+  observations: z.string().optional(),
+  service_type: z.string().min(1, "Debe seleccionar un tipo de servicio"),
+  urgency: z.string().min(1, "Debe seleccionar un nivel de urgencia"),
+  status: z.string().default("Pendiente"),
+});
 
-const brands = [
-  "Samsung",
-  "LG",
-  "Whirlpool",
-  "Mabe",
-  "Maytag",
-  "Bosch",
-  "GE",
-  "Electrolux",
-  "Frigidaire",
-  "KitchenAid",
-  "Teka",
-  "Daewoo",
-  "Otra",
-];
+type OrderFormValues = z.infer<typeof orderSchema>;
 
 export default function OrderForm() {
+  const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Estado para los datos del formulario
-  const [formData, setFormData] = useState({
-    // Cliente
-    clientName: "",
-    clientPhone: "",
-    clientEmail: "",
-    clientAddress: "",
-    
-    // Electrodoméstico
-    applianceType: "",
-    brand: "",
-    model: "",
-    serialNumber: "",
-    
-    // Detalles
-    problemDescription: "",
-    observations: "",
-    
-    // Servicio
-    serviceType: "domicilio", // domicilio o taller
-    urgency: "normal", // baja, normal, alta
+  const queryClient = useQueryClient();
+  const isEditMode = !!id;
+  const preselectedClientId = searchParams.get("clientId");
+
+  const form = useForm<OrderFormValues>({
+    resolver: zodResolver(orderSchema),
+    defaultValues: {
+      client_id: preselectedClientId || "",
+      appliance_type: "",
+      brand_id: "",
+      model: "",
+      serial_number: "",
+      problem_description: "",
+      observations: "",
+      service_type: "domicilio",
+      urgency: "normal",
+      status: "Pendiente",
+    },
   });
-  
-  // Manejador para cambios en los inputs
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-  
-  // Manejador para selects
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-  
-  // Enviar formulario
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    
-    // Simulación de envío (aquí integraremos Supabase más adelante)
-    setTimeout(() => {
-      toast({
-        title: "Orden creada con éxito",
-        description: "La orden de servicio ha sido registrada correctamente",
+
+  // Fetch clients
+  const { data: clients } = useQuery({
+    queryKey: ["clients"],
+    queryFn: clientsApi.getAll,
+  });
+
+  // Fetch appliance types
+  const { data: applianceTypes } = useQuery({
+    queryKey: ["applianceTypes"],
+    queryFn: applianceTypesApi.getAll,
+  });
+
+  // Fetch brands
+  const { data: brands } = useQuery({
+    queryKey: ["brands"],
+    queryFn: brandsApi.getAll,
+  });
+
+  // Fetch order data if in edit mode
+  const { data: order, isLoading: isLoadingOrder } = useQuery({
+    queryKey: ["order", id],
+    queryFn: () => serviceOrdersApi.getById(id!),
+    enabled: isEditMode,
+  });
+
+  // Set form values when order data is loaded
+  useEffect(() => {
+    if (order) {
+      form.reset({
+        client_id: order.client_id,
+        appliance_type: order.appliance_type,
+        brand_id: order.brand_id,
+        model: order.model || "",
+        serial_number: order.serial_number || "",
+        problem_description: order.problem_description,
+        observations: order.observations || "",
+        service_type: order.service_type,
+        urgency: order.urgency,
+        status: order.status,
       });
-      setIsSubmitting(false);
-      navigate("/orders");
-    }, 1500);
+    }
+  }, [order, form]);
+
+  // Create mutation
+  const createMutation = useMutation({
+    mutationFn: (values: OrderFormValues) => serviceOrdersApi.create(values),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      toast({
+        title: "Orden creada",
+        description: "La orden de servicio ha sido creada correctamente",
+      });
+      navigate(`/orders/${data?.id}`);
+    },
+  });
+
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: (values: OrderFormValues) => serviceOrdersApi.update(id!, values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["order", id] });
+      toast({
+        title: "Orden actualizada",
+        description: "La orden de servicio ha sido actualizada correctamente",
+      });
+      navigate(`/orders/${id}`);
+    },
+  });
+
+  const onSubmit = (values: OrderFormValues) => {
+    if (isEditMode) {
+      updateMutation.mutate(values);
+    } else {
+      createMutation.mutate(values);
+    }
   };
+
+  if (isEditMode && isLoadingOrder) {
+    return <div className="flex justify-center p-8">Cargando datos de la orden...</div>;
+  }
 
   return (
-    <AppLayout>
-      <div className="space-y-6 animate-fade-in pb-10">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/orders")}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="notion-heading">Nueva Orden de Servicio</h1>
-          </div>
+    <div className="space-y-6 animate-fade-in pb-10">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
           <Button
-            className="notion-button"
-            onClick={handleSubmit}
-            disabled={isSubmitting}
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/orders")}
           >
-            <Save className="mr-2 h-4 w-4" />
-            {isSubmitting ? "Guardando..." : "Guardar Orden"}
+            <ArrowLeft className="h-5 w-5" />
           </Button>
+          <h1 className="notion-heading">
+            {isEditMode ? "Editar Orden de Servicio" : "Nueva Orden de Servicio"}
+          </h1>
         </div>
+        <Button
+          className="notion-button"
+          onClick={form.handleSubmit(onSubmit)}
+          disabled={createMutation.isPending || updateMutation.isPending}
+        >
+          <Save className="mr-2 h-4 w-4" />
+          {createMutation.isPending || updateMutation.isPending ? "Guardando..." : "Guardar Orden"}
+        </Button>
+      </div>
 
-        <form onSubmit={handleSubmit}>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
           <Tabs defaultValue="client" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="client">Datos del Cliente</TabsTrigger>
@@ -149,58 +191,47 @@ export default function OrderForm() {
                 <CardHeader>
                   <CardTitle>Información del Cliente</CardTitle>
                   <CardDescription>
-                    Ingresa los datos del cliente para la orden de servicio
+                    Selecciona el cliente para la orden de servicio
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="clientName">Nombre completo *</Label>
-                      <Input
-                        id="clientName"
-                        name="clientName"
-                        value={formData.clientName}
-                        onChange={handleChange}
-                        placeholder="Nombre y apellidos"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="clientPhone">Teléfono *</Label>
-                      <Input
-                        id="clientPhone"
-                        name="clientPhone"
-                        value={formData.clientPhone}
-                        onChange={handleChange}
-                        placeholder="Número de contacto"
-                        required
-                      />
-                    </div>
-                  </div>
+                <CardContent>
+                  <FormField
+                    control={form.control}
+                    name="client_id"
+                    render={({ field }) => (
+                      <FormItem className="mb-4">
+                        <FormLabel>Cliente *</FormLabel>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          defaultValue={field.value}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar cliente" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {clients?.map((client) => (
+                              <SelectItem key={client.id} value={client.id}>
+                                {client.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="clientEmail">Correo electrónico</Label>
-                    <Input
-                      id="clientEmail"
-                      name="clientEmail"
-                      type="email"
-                      value={formData.clientEmail}
-                      onChange={handleChange}
-                      placeholder="correo@ejemplo.com"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="clientAddress">Dirección completa *</Label>
-                    <Textarea
-                      id="clientAddress"
-                      name="clientAddress"
-                      value={formData.clientAddress}
-                      onChange={handleChange}
-                      placeholder="Calle, número, colonia, ciudad, código postal"
-                      rows={3}
-                      required
-                    />
+                  <div className="flex justify-end mt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate("/clients/new")}
+                    >
+                      Nuevo cliente
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -216,80 +247,112 @@ export default function OrderForm() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="applianceType">Tipo de electrodoméstico *</Label>
-                      <Select 
-                        value={formData.applianceType} 
-                        onValueChange={(value) => handleSelectChange("applianceType", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {applianceTypes.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="brand">Marca *</Label>
-                      <Select 
-                        value={formData.brand} 
-                        onValueChange={(value) => handleSelectChange("brand", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar marca" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {brands.map((brand) => (
-                            <SelectItem key={brand} value={brand}>
-                              {brand}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <FormField
+                      control={form.control}
+                      name="appliance_type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tipo de electrodoméstico *</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            defaultValue={field.value}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar tipo" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {applianceTypes?.map((type) => (
+                                <SelectItem key={type.id} value={type.id}>
+                                  {type.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="brand_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Marca *</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            defaultValue={field.value}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar marca" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {brands?.map((brand) => (
+                                <SelectItem key={brand.id} value={brand.id}>
+                                  {brand.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="model">Modelo *</Label>
-                      <Input
-                        id="model"
-                        name="model"
-                        value={formData.model}
-                        onChange={handleChange}
-                        placeholder="Modelo del electrodoméstico"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="serialNumber">Número de serie</Label>
-                      <Input
-                        id="serialNumber"
-                        name="serialNumber"
-                        value={formData.serialNumber}
-                        onChange={handleChange}
-                        placeholder="Número de serie (opcional)"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="problemDescription">Descripción de la falla *</Label>
-                    <Textarea
-                      id="problemDescription"
-                      name="problemDescription"
-                      value={formData.problemDescription}
-                      onChange={handleChange}
-                      placeholder="Describe el problema reportado por el cliente"
-                      rows={4}
-                      required
+                    <FormField
+                      control={form.control}
+                      name="model"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Modelo</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Modelo del electrodoméstico" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="serial_number"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Número de serie</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Número de serie (opcional)" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
                   </div>
+                  
+                  <FormField
+                    control={form.control}
+                    name="problem_description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Descripción de la falla *</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            placeholder="Describe el problema reportado por el cliente"
+                            rows={4}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -304,65 +367,92 @@ export default function OrderForm() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Tipo de servicio *</Label>
-                      <Select 
-                        value={formData.serviceType} 
-                        onValueChange={(value) => handleSelectChange("serviceType", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="domicilio">Servicio a domicilio</SelectItem>
-                          <SelectItem value="taller">Reparación en taller</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Urgencia *</Label>
-                      <Select 
-                        value={formData.urgency} 
-                        onValueChange={(value) => handleSelectChange("urgency", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar prioridad" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="baja">Baja</SelectItem>
-                          <SelectItem value="normal">Normal</SelectItem>
-                          <SelectItem value="alta">Alta</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="observations">Observaciones adicionales</Label>
-                    <Textarea
-                      id="observations"
-                      name="observations"
-                      value={formData.observations}
-                      onChange={handleChange}
-                      placeholder="Cualquier información adicional relevante para el servicio"
-                      rows={4}
+                    <FormField
+                      control={form.control}
+                      name="service_type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tipo de servicio *</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            defaultValue={field.value}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar tipo" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="domicilio">Servicio a domicilio</SelectItem>
+                              <SelectItem value="taller">Reparación en taller</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="urgency"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Urgencia *</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            defaultValue={field.value}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar prioridad" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="baja">Baja</SelectItem>
+                              <SelectItem value="normal">Normal</SelectItem>
+                              <SelectItem value="alta">Alta</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
                   </div>
+                  
+                  <FormField
+                    control={form.control}
+                    name="observations"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Observaciones adicionales</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            placeholder="Cualquier información adicional relevante para el servicio"
+                            rows={4}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </CardContent>
                 <CardFooter className="flex justify-between">
                   <p className="text-sm text-notion-gray">
                     * Campos obligatorios
                   </p>
-                  <Button type="submit" className="notion-button" disabled={isSubmitting}>
+                  <Button type="submit" className="notion-button" disabled={createMutation.isPending || updateMutation.isPending}>
                     <Save className="mr-2 h-4 w-4" />
-                    {isSubmitting ? "Guardando..." : "Guardar Orden"}
+                    {createMutation.isPending || updateMutation.isPending ? "Guardando..." : "Guardar Orden"}
                   </Button>
                 </CardFooter>
               </Card>
             </TabsContent>
           </Tabs>
         </form>
-      </div>
-    </AppLayout>
+      </Form>
+    </div>
   );
 }

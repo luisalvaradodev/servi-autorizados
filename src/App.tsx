@@ -12,6 +12,8 @@ import OrderForm from "./pages/OrderForm";
 import OrderDetail from "./pages/OrderDetail";
 import OrderPrint from "./pages/OrderPrint";
 import ClientsList from "./pages/ClientsList";
+import ClientForm from "./pages/ClientForm";
+import ClientDetail from "./pages/ClientDetail";
 import Schedule from "./pages/Schedule";
 import NotFound from "./pages/NotFound";
 
@@ -34,13 +36,13 @@ const App = () => (
           <Route path="/orders/new" element={<AppLayout><OrderForm /></AppLayout>} />
           <Route path="/orders/:id" element={<AppLayout><OrderDetail /></AppLayout>} />
           <Route path="/orders/:id/edit" element={<AppLayout><OrderForm /></AppLayout>} />
-          <Route path="/orders/:id/print" element={<AppLayout><OrderPrint /></AppLayout>} />
+          <Route path="/orders/:id/print" element={<OrderPrint />} />
           
           {/* Rutas de clientes */}
           <Route path="/clients" element={<AppLayout><ClientsList /></AppLayout>} />
-          <Route path="/clients/new" element={<AppLayout><OrderForm /></AppLayout>} />
-          <Route path="/clients/:id" element={<AppLayout><OrderDetail /></AppLayout>} />
-          <Route path="/clients/:id/edit" element={<AppLayout><OrderForm /></AppLayout>} />
+          <Route path="/clients/new" element={<AppLayout><ClientForm /></AppLayout>} />
+          <Route path="/clients/:id" element={<AppLayout><ClientDetail /></AppLayout>} />
+          <Route path="/clients/:id/edit" element={<AppLayout><ClientForm /></AppLayout>} />
           
           {/* Rutas de agenda */}
           <Route path="/schedule" element={<AppLayout><Schedule /></AppLayout>} />
