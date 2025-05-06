@@ -1,18 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi, applianceTypesApi, brandsApi, serviceOrdersApi } from "@/services/api";
+import { clientsApi, applianceTypesApi, brandsApi, serviceOrdersApi, techniciansApi } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
 import { 
   Card, 
   CardContent, 
@@ -24,12 +17,35 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SectionHeader } from "@/components/ui/section-header";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, UserPlus } from "lucide-react";
+import { ArrowLeft, Save, UserPlus, ChevronsUpDown, Check } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const timeSlots = [
+  "09:00 - 11:00",
+  "11:00 - 13:00",
+  "13:00 - 15:00",
+  "15:00 - 17:00",
+  "17:00 - 19:00",
+];
 
 const orderSchema = z.object({
   client_id: z.string().min(1, "Debe seleccionar un cliente"),
@@ -42,6 +58,8 @@ const orderSchema = z.object({
   service_type: z.string().min(1, "Debe seleccionar un tipo de servicio"),
   urgency: z.string().min(1, "Debe seleccionar un nivel de urgencia"),
   status: z.string().default("Pendiente"),
+  technician_id: z.string().optional(),
+  time_slot: z.string().optional(),
 });
 
 type OrderFormValues = z.infer<typeof orderSchema>;
@@ -69,67 +87,59 @@ export default function OrderForm() {
       service_type: "domicilio",
       urgency: "normal",
       status: "Pendiente",
+      technician_id: "",
+      time_slot: "",
     },
   });
 
-  // Fetch clients
   const { data: clients } = useQuery({
     queryKey: ["clients"],
     queryFn: clientsApi.getAll,
   });
 
-  // Fetch appliance types
   const { data: applianceTypes } = useQuery({
     queryKey: ["applianceTypes"],
     queryFn: applianceTypesApi.getAll,
   });
 
-  // Fetch brands
   const { data: brands } = useQuery({
     queryKey: ["brands"],
     queryFn: brandsApi.getAll,
   });
 
-  // Fetch order data if in edit mode
+  const { data: technicians } = useQuery({
+    queryKey: ["technicians"],
+    queryFn: techniciansApi.getAll,
+  });
+
   const { data: order, isLoading: isLoadingOrder } = useQuery({
     queryKey: ["order", id],
     queryFn: () => serviceOrdersApi.getById(id!),
     enabled: isEditMode,
   });
 
-  // Set form values when order data is loaded
   useEffect(() => {
     if (order) {
       form.reset({
-        client_id: order.client_id,
-        appliance_type: order.appliance_type,
-        brand_id: order.brand_id,
+        ...order,
         model: order.model || "",
         serial_number: order.serial_number || "",
-        problem_description: order.problem_description,
         observations: order.observations || "",
-        service_type: order.service_type,
-        urgency: order.urgency,
-        status: order.status,
+        technician_id: order.technician_id || "",
+        time_slot: order.time_slot || "",
       });
     }
   }, [order, form]);
 
-  // Create mutation
   const createMutation = useMutation({
     mutationFn: (values: OrderFormValues) => {
-      // Ensure all required fields are included with their proper types
       const orderData = {
-        client_id: values.client_id,
-        appliance_type: values.appliance_type,
-        brand_id: values.brand_id,
+        ...values,
         model: values.model || null,
         serial_number: values.serial_number || null,
-        problem_description: values.problem_description,
         observations: values.observations || null,
-        service_type: values.service_type,
-        urgency: values.urgency,
-        status: values.status,
+        technician_id: values.technician_id || null,
+        time_slot: values.time_slot || null,
       };
       return serviceOrdersApi.create(orderData);
     },
@@ -143,21 +153,15 @@ export default function OrderForm() {
     },
   });
 
-  // Update mutation
   const updateMutation = useMutation({
     mutationFn: (values: OrderFormValues) => {
-      // Ensure all required fields are included with their proper types
       const orderData = {
-        client_id: values.client_id,
-        appliance_type: values.appliance_type,
-        brand_id: values.brand_id,
+        ...values,
         model: values.model || null,
         serial_number: values.serial_number || null,
-        problem_description: values.problem_description,
         observations: values.observations || null,
-        service_type: values.service_type,
-        urgency: values.urgency,
-        status: values.status,
+        technician_id: values.technician_id || null,
+        time_slot: values.time_slot || null,
       };
       return serviceOrdersApi.update(id!, orderData);
     },
@@ -546,6 +550,116 @@ export default function OrderForm() {
                                     <SelectItem value="alta">Alta</SelectItem>
                                   </SelectContent>
                                 </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                            control={form.control}
+                            name="technician_id"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col">
+                                <FormLabel>Técnico asignado</FormLabel>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      className="w-full justify-between"
+                                    >
+                                      {field.value
+                                        ? technicians?.find(t => t.id === field.value)?.name
+                                        : "Seleccionar técnico"}
+                                      <ChevronsUpDown className="ml-2 h-4 w-4" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="p-0">
+                                    <Command>
+                                      <CommandInput placeholder="Buscar técnico..." />
+                                      <CommandList>
+                                        <CommandEmpty>No se encontraron técnicos</CommandEmpty>
+                                        <CommandGroup>
+                                          <CommandItem
+                                            value=""
+                                            onSelect={() => form.setValue('technician_id', '')}
+                                          >
+                                            <Check
+                                              className={cn(
+                                                "mr-2 h-4 w-4",
+                                                !field.value ? "opacity-100" : "opacity-0"
+                                              )}
+                                            />
+                                            Sin asignar
+                                          </CommandItem>
+                                          {technicians?.map((tech) => (
+                                            <CommandItem
+                                              key={tech.id}
+                                              value={tech.id}
+                                              onSelect={() => form.setValue('technician_id', tech.id)}
+                                            >
+                                              <Check
+                                                className={cn(
+                                                  "mr-2 h-4 w-4",
+                                                  field.value === tech.id ? "opacity-100" : "opacity-0"
+                                                )}
+                                              />
+                                              {tech.name}
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="time_slot"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col">
+                                <FormLabel>Horario preferente</FormLabel>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      className="w-full justify-between"
+                                    >
+                                      {field.value || "Seleccionar horario"}
+                                      <ChevronsUpDown className="ml-2 h-4 w-4" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="p-0">
+                                    <Command>
+                                      <CommandInput placeholder="Buscar horario..." />
+                                      <CommandList>
+                                        <CommandEmpty>No hay horarios</CommandEmpty>
+                                        <CommandGroup>
+                                          {timeSlots.map((slot) => (
+                                            <CommandItem
+                                              key={slot}
+                                              value={slot}
+                                              onSelect={() => form.setValue('time_slot', slot)}
+                                            >
+                                              <Check
+                                                className={cn(
+                                                  "mr-2 h-4 w-4",
+                                                  field.value === slot ? "opacity-100" : "opacity-0"
+                                                )}
+                                              />
+                                              {slot}
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
                                 <FormMessage />
                               </FormItem>
                             )}

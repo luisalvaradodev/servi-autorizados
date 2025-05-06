@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { serviceOrdersApi, clientsApi, applianceTypesApi, brandsApi, appointmentsApi } from "@/services/api";
+import { serviceOrdersApi, clientsApi, applianceTypesApi, brandsApi, appointmentsApi, techniciansApi } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SectionHeader } from "@/components/ui/section-header";
 import { InfoGroup } from "@/components/ui/info-group";
-import { CalendarDays, Clock, Edit, FileText, Printer, User, ArrowLeft, Plus, Trash, Save } from "lucide-react";
+import { CalendarDays, Clock, Edit, FileText, Printer, User, ArrowLeft, Plus, Trash, Save, Check, ChevronsUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
   AlertDialog,
@@ -26,6 +26,28 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { motion } from "framer-motion";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
+
+const timeSlots = [
+  "09:00 - 11:00",
+  "11:00 - 13:00",
+  "13:00 - 15:00",
+  "15:00 - 17:00",
+  "17:00 - 19:00",
+];
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +56,10 @@ export default function OrderDetail() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("details");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const { data: technicians } = useQuery({
+    queryKey: ["technicians"],
+    queryFn: techniciansApi.getAll,
+  });
   
   // Form states for editable fields
   const [diagnosis, setDiagnosis] = useState("");
@@ -411,24 +437,24 @@ export default function OrderDetail() {
               <CardTitle className="text-lg">Servicio programado</CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
-              {appointment ? (
-                <div className="flex flex-col space-y-3">
-                  <InfoGroup
-                    label="Fecha"
-                    value={new Date(appointment.date).toLocaleDateString()}
-                    icon={<CalendarDays className="h-4 w-4 text-muted-foreground" />}
-                  />
-                  <InfoGroup
-                    label="Horario"
-                    value={appointment.time_slot}
-                    icon={<Clock className="h-4 w-4 text-muted-foreground" />}
-                  />
-                  <InfoGroup
-                    label="Técnico"
-                    value={appointment.technician || "No asignado"}
-                    icon={<User className="h-4 w-4 text-muted-foreground" />}
-                  />
-                </div>
+            {appointment ? (
+    <div className="flex flex-col space-y-3">
+      <InfoGroup
+        label="Fecha"
+        value={new Date(appointment.date).toLocaleDateString()}
+        icon={<CalendarDays className="h-4 w-4 text-muted-foreground" />}
+      />
+      <InfoGroup
+        label="Horario"
+        value={appointment.time_slot}
+        icon={<Clock className="h-4 w-4 text-muted-foreground" />}
+      />
+      <InfoGroup
+        label="Técnico"
+        value={technicians?.find(t => t.id === appointment.technician)?.name || "No asignado"}
+        icon={<User className="h-4 w-4 text-muted-foreground" />}
+      />
+    </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-24 text-center">
                   <p className="text-sm text-muted-foreground mb-2">No hay cita programada</p>
@@ -613,56 +639,127 @@ export default function OrderDetail() {
                 </div>
                 
                 <div className="mt-8">
-                  <h3 className="text-lg font-medium mb-4">Programar Servicio</h3>
-                  <div className="bg-muted/30 p-4 rounded-lg">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="appointmentDate" className="text-sm">Fecha</Label>
-                        <Input 
-                          id="appointmentDate" 
-                          type="date" 
-                          value={appointmentDate}
-                          onChange={(e) => setAppointmentDate(e.target.value)}
-                          className="transition-all"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="appointmentTime" className="text-sm">Hora</Label>
-                        <Input 
-                          id="appointmentTime" 
-                          type="text" 
-                          value={appointmentTime}
-                          onChange={(e) => setAppointmentTime(e.target.value)}
-                          placeholder="Ej: 9:00 - 12:00"
-                          className="transition-all"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="appointmentTechnician" className="text-sm">Técnico asignado</Label>
-                        <Input 
-                          id="appointmentTechnician" 
-                          value={appointmentTechnician}
-                          onChange={(e) => setAppointmentTechnician(e.target.value)}
-                          placeholder="Nombre del técnico"
-                          className="transition-all"
-                        />
-                      </div>
-                    </div>
-                    <div className="mt-4 flex justify-end">
-                      <Button 
-                        onClick={handleSaveAppointment}
-                        disabled={updateAppointmentMutation.isPending}
-                        size="sm"
+    <h3 className="text-lg font-medium mb-4">Programar Servicio</h3>
+    <div className="bg-muted/30 p-4 rounded-lg">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="appointmentDate" className="text-sm">Fecha</Label>
+          <Input 
+            id="appointmentDate" 
+            type="date" 
+            value={appointmentDate}
+            onChange={(e) => setAppointmentDate(e.target.value)}
+            className="transition-all"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-sm">Horario</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-between"
+              >
+                {appointmentTime || "Seleccionar horario"}
+                <ChevronsUpDown className="ml-2 h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-0">
+              <Command>
+                <CommandInput placeholder="Buscar horario..." />
+                <CommandList>
+                  <CommandEmpty>No hay horarios</CommandEmpty>
+                  <CommandGroup>
+                    {timeSlots.map((slot) => (
+                      <CommandItem
+                        key={slot}
+                        value={slot}
+                        onSelect={() => setAppointmentTime(slot)}
                       >
-                        {updateAppointmentMutation.isPending && (
-                          <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-b-transparent"></span>
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            appointmentTime === slot ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        {slot}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+        <div className="space-y-2">
+          <Label className="text-sm">Técnico</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-between"
+              >
+                {appointmentTechnician
+                  ? technicians?.find(t => t.id === appointmentTechnician)?.name
+                  : "Seleccionar técnico"}
+                <ChevronsUpDown className="ml-2 h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-0">
+              <Command>
+                <CommandInput placeholder="Buscar técnico..." />
+                <CommandList>
+                  <CommandEmpty>No se encontraron técnicos</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      value=""
+                      onSelect={() => setAppointmentTechnician("")}
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          !appointmentTechnician ? "opacity-100" : "opacity-0"
                         )}
-                        <CalendarDays className={`mr-2 h-4 w-4 ${updateAppointmentMutation.isPending ? 'hidden' : ''}`} />
-                        {appointment ? "Actualizar cita" : "Programar cita"}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                      />
+                      Sin asignar
+                    </CommandItem>
+                    {technicians?.map((tech) => (
+                      <CommandItem
+                        key={tech.id}
+                        value={tech.id}
+                        onSelect={() => setAppointmentTechnician(tech.id)}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            appointmentTechnician === tech.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        {tech.name}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+      <div className="mt-4 flex justify-end">
+        <Button 
+          onClick={handleSaveAppointment}
+          disabled={updateAppointmentMutation.isPending}
+          size="sm"
+        >
+          {updateAppointmentMutation.isPending && (
+            <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-b-transparent"></span>
+          )}
+          <CalendarDays className={`mr-2 h-4 w-4 ${updateAppointmentMutation.isPending ? 'hidden' : ''}`} />
+          {appointment ? "Actualizar cita" : "Programar cita"}
+        </Button>
+      </div>
+    </div>
+  </div>
               </CardContent>
             </Card>
           </motion.div>
