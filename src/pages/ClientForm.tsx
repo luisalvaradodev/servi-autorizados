@@ -62,7 +62,16 @@ export default function ClientForm() {
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (values: ClientFormValues) => clientsApi.create(values),
+    mutationFn: (values: ClientFormValues) => {
+      // Ensure name is treated as required
+      const clientData = {
+        name: values.name, // This is required
+        email: values.email || null,
+        phone: values.phone || null,
+        address: values.address || null,
+      };
+      return clientsApi.create(clientData);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
       navigate("/clients");
@@ -71,7 +80,16 @@ export default function ClientForm() {
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: (values: ClientFormValues) => clientsApi.update(id!, values),
+    mutationFn: (values: ClientFormValues) => {
+      // Ensure name is treated as required
+      const clientData = {
+        name: values.name, // This is required
+        email: values.email || null,
+        phone: values.phone || null,
+        address: values.address || null,
+      };
+      return clientsApi.update(id!, clientData);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
       queryClient.invalidateQueries({ queryKey: ["client", id] });

@@ -115,7 +115,22 @@ export default function OrderForm() {
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (values: OrderFormValues) => serviceOrdersApi.create(values),
+    mutationFn: (values: OrderFormValues) => {
+      // Ensure all required fields are included with their proper types
+      const orderData = {
+        client_id: values.client_id,
+        appliance_type: values.appliance_type,
+        brand_id: values.brand_id,
+        model: values.model || null,
+        serial_number: values.serial_number || null,
+        problem_description: values.problem_description,
+        observations: values.observations || null,
+        service_type: values.service_type,
+        urgency: values.urgency,
+        status: values.status,
+      };
+      return serviceOrdersApi.create(orderData);
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       toast({
@@ -128,7 +143,22 @@ export default function OrderForm() {
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: (values: OrderFormValues) => serviceOrdersApi.update(id!, values),
+    mutationFn: (values: OrderFormValues) => {
+      // Ensure all required fields are included with their proper types
+      const orderData = {
+        client_id: values.client_id,
+        appliance_type: values.appliance_type,
+        brand_id: values.brand_id,
+        model: values.model || null,
+        serial_number: values.serial_number || null,
+        problem_description: values.problem_description,
+        observations: values.observations || null,
+        service_type: values.service_type,
+        urgency: values.urgency,
+        status: values.status,
+      };
+      return serviceOrdersApi.update(id!, orderData);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["order", id] });

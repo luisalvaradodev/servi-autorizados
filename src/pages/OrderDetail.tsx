@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { serviceOrdersApi, clientsApi, applianceTypesApi, brandsApi } from "@/services/api";
+import { serviceOrdersApi, clientsApi, applianceTypesApi, brandsApi, appointmentsApi } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
