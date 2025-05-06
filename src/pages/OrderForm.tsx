@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -23,12 +22,14 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SectionHeader } from "@/components/ui/section-header";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Trash } from "lucide-react";
+import { ArrowLeft, Save, UserPlus } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { motion, AnimatePresence } from "framer-motion";
 
 const orderSchema = z.object({
   client_id: z.string().min(1, "Debe seleccionar un cliente"),
@@ -53,6 +54,7 @@ export default function OrderForm() {
   const queryClient = useQueryClient();
   const isEditMode = !!id;
   const preselectedClientId = searchParams.get("clientId");
+  const [activeTab, setActiveTab] = useState("client");
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderSchema),
@@ -177,309 +179,423 @@ export default function OrderForm() {
       createMutation.mutate(values);
     }
   };
+  
+  const handleNextTab = () => {
+    if (activeTab === "client") setActiveTab("appliance");
+    else if (activeTab === "appliance") setActiveTab("service");
+  };
+  
+  const handlePrevTab = () => {
+    if (activeTab === "service") setActiveTab("appliance");
+    else if (activeTab === "appliance") setActiveTab("client");
+  };
 
   if (isEditMode && isLoadingOrder) {
-    return <div className="flex justify-center p-8">Cargando datos de la orden...</div>;
+    return (
+      <div className="flex justify-center items-center min-h-[70vh]">
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+          <p className="text-muted-foreground">Cargando datos de la orden...</p>
+        </div>
+      </div>
+    );
   }
 
+  const isFirstTabValid = !!form.getValues().client_id;
+  const isSecondTabValid = !!form.getValues().appliance_type && 
+                          !!form.getValues().brand_id && 
+                          !!form.getValues().problem_description;
+  
   return (
-    <div className="space-y-6 animate-fade-in pb-10">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/orders")}
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="notion-heading">
-            {isEditMode ? "Editar Orden de Servicio" : "Nueva Orden de Servicio"}
-          </h1>
-        </div>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
+      <SectionHeader
+        title={isEditMode ? "Editar Orden de Servicio" : "Nueva Orden de Servicio"}
+        subtitle={isEditMode ? "Modifica los datos de la orden existente" : "Completa el formulario para crear una nueva orden"}
+        onBack={() => navigate("/orders")}
+      >
         <Button
-          className="notion-button"
           onClick={form.handleSubmit(onSubmit)}
           disabled={createMutation.isPending || updateMutation.isPending}
+          className="h-9"
         >
-          <Save className="mr-2 h-4 w-4" />
+          {(createMutation.isPending || updateMutation.isPending) && (
+            <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-b-transparent"></span>
+          )}
+          <Save className={`mr-2 h-4 w-4 ${createMutation.isPending || updateMutation.isPending ? 'hidden' : ''}`} />
           {createMutation.isPending || updateMutation.isPending ? "Guardando..." : "Guardar Orden"}
         </Button>
-      </div>
+      </SectionHeader>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <Tabs defaultValue="client" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="client">Datos del Cliente</TabsTrigger>
-              <TabsTrigger value="appliance">Electrodoméstico</TabsTrigger>
-              <TabsTrigger value="service">Detalles del Servicio</TabsTrigger>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-6">
+              <TabsTrigger value="client" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                1. Datos del Cliente
+              </TabsTrigger>
+              <TabsTrigger 
+                value="appliance" 
+                disabled={!isFirstTabValid && !isEditMode}
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                2. Electrodoméstico
+              </TabsTrigger>
+              <TabsTrigger 
+                value="service" 
+                disabled={(!isFirstTabValid || !isSecondTabValid) && !isEditMode}
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                3. Detalles del Servicio
+              </TabsTrigger>
             </TabsList>
             
-            <TabsContent value="client" className="space-y-4 mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Información del Cliente</CardTitle>
-                  <CardDescription>
-                    Selecciona el cliente para la orden de servicio
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <FormField
-                    control={form.control}
-                    name="client_id"
-                    render={({ field }) => (
-                      <FormItem className="mb-4">
-                        <FormLabel>Cliente *</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
-                          defaultValue={field.value}
-                          value={field.value}
+            <AnimatePresence mode="wait">
+              {activeTab === "client" && (
+                <motion.div
+                  key="client-tab"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <TabsContent value="client" className="pt-2">
+                    <Card>
+                      <CardHeader className="bg-muted/50">
+                        <CardTitle>Información del Cliente</CardTitle>
+                        <CardDescription>
+                          Selecciona el cliente para la orden de servicio
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-6">
+                        <FormField
+                          control={form.control}
+                          name="client_id"
+                          render={({ field }) => (
+                            <FormItem className="mb-6">
+                              <FormLabel className="text-base">Cliente *</FormLabel>
+                              <div className="mt-1">
+                                <Select 
+                                  onValueChange={field.onChange} 
+                                  defaultValue={field.value}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="w-full transition-all">
+                                      <SelectValue placeholder="Seleccionar cliente" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {clients?.map((client) => (
+                                      <SelectItem key={client.id} value={client.id}>
+                                        {client.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <div className="flex justify-between items-center mt-6">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => navigate("/clients/new")}
+                            className="gap-2"
+                          >
+                            <UserPlus className="h-4 w-4" />
+                            Nuevo cliente
+                          </Button>
+                          
+                          <Button
+                            type="button"
+                            onClick={handleNextTab}
+                            disabled={!isFirstTabValid && !isEditMode}
+                          >
+                            Siguiente
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </motion.div>
+              )}
+            
+              {activeTab === "appliance" && (
+                <motion.div
+                  key="appliance-tab"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <TabsContent value="appliance" className="pt-2">
+                    <Card>
+                      <CardHeader className="bg-muted/50">
+                        <CardTitle>Datos del Electrodoméstico</CardTitle>
+                        <CardDescription>
+                          Ingresa la información del electrodoméstico a reparar
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-6 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                            control={form.control}
+                            name="appliance_type"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-base">Tipo de electrodoméstico *</FormLabel>
+                                <Select 
+                                  onValueChange={field.onChange} 
+                                  defaultValue={field.value}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="w-full transition-all">
+                                      <SelectValue placeholder="Seleccionar tipo" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {applianceTypes?.map((type) => (
+                                      <SelectItem key={type.id} value={type.id}>
+                                        {type.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={form.control}
+                            name="brand_id"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-base">Marca *</FormLabel>
+                                <Select 
+                                  onValueChange={field.onChange} 
+                                  defaultValue={field.value}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="w-full transition-all">
+                                      <SelectValue placeholder="Seleccionar marca" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {brands?.map((brand) => (
+                                      <SelectItem key={brand.id} value={brand.id}>
+                                        {brand.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                            control={form.control}
+                            name="model"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-base">Modelo</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    {...field} 
+                                    placeholder="Modelo del electrodoméstico" 
+                                    className="transition-all"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={form.control}
+                            name="serial_number"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-base">Número de serie</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    {...field} 
+                                    placeholder="Número de serie (opcional)" 
+                                    className="transition-all"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        <FormField
+                          control={form.control}
+                          name="problem_description"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base">Descripción de la falla *</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  {...field}
+                                  placeholder="Describe el problema reportado por el cliente"
+                                  rows={4}
+                                  className="resize-none transition-all"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <div className="flex justify-between items-center mt-6">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handlePrevTab}
+                          >
+                            Anterior
+                          </Button>
+                          
+                          <Button
+                            type="button"
+                            onClick={handleNextTab}
+                            disabled={!isSecondTabValid && !isEditMode}
+                          >
+                            Siguiente
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </motion.div>
+              )}
+              
+              {activeTab === "service" && (
+                <motion.div
+                  key="service-tab"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <TabsContent value="service" className="pt-2">
+                    <Card>
+                      <CardHeader className="bg-muted/50">
+                        <CardTitle>Detalles del Servicio</CardTitle>
+                        <CardDescription>
+                          Configura los detalles del servicio a realizar
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-6 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                            control={form.control}
+                            name="service_type"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-base">Tipo de servicio *</FormLabel>
+                                <Select 
+                                  onValueChange={field.onChange} 
+                                  defaultValue={field.value}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="w-full transition-all">
+                                      <SelectValue placeholder="Seleccionar tipo" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="domicilio">Servicio a domicilio</SelectItem>
+                                    <SelectItem value="taller">Reparación en taller</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={form.control}
+                            name="urgency"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-base">Urgencia *</FormLabel>
+                                <Select 
+                                  onValueChange={field.onChange} 
+                                  defaultValue={field.value}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="w-full transition-all">
+                                      <SelectValue placeholder="Seleccionar prioridad" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="baja">Baja</SelectItem>
+                                    <SelectItem value="normal">Normal</SelectItem>
+                                    <SelectItem value="alta">Alta</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        <FormField
+                          control={form.control}
+                          name="observations"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base">Observaciones adicionales</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  {...field}
+                                  placeholder="Cualquier información adicional relevante para el servicio"
+                                  rows={4}
+                                  className="resize-none transition-all"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </CardContent>
+                      <CardFooter className="bg-muted/30 py-4 flex justify-between">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handlePrevTab}
                         >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccionar cliente" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {clients?.map((client) => (
-                              <SelectItem key={client.id} value={client.id}>
-                                {client.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="flex justify-end mt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => navigate("/clients/new")}
-                    >
-                      Nuevo cliente
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="appliance" className="space-y-4 mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Datos del Electrodoméstico</CardTitle>
-                  <CardDescription>
-                    Ingresa la información del electrodoméstico a reparar
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="appliance_type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tipo de electrodoméstico *</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Seleccionar tipo" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {applianceTypes?.map((type) => (
-                                <SelectItem key={type.id} value={type.id}>
-                                  {type.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="brand_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Marca *</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Seleccionar marca" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {brands?.map((brand) => (
-                                <SelectItem key={brand.id} value={brand.id}>
-                                  {brand.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="model"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Modelo</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="Modelo del electrodoméstico" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="serial_number"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Número de serie</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="Número de serie (opcional)" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <FormField
-                    control={form.control}
-                    name="problem_description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Descripción de la falla *</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            {...field}
-                            placeholder="Describe el problema reportado por el cliente"
-                            rows={4}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="service" className="space-y-4 mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Detalles del Servicio</CardTitle>
-                  <CardDescription>
-                    Configura los detalles del servicio a realizar
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="service_type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tipo de servicio *</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Seleccionar tipo" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="domicilio">Servicio a domicilio</SelectItem>
-                              <SelectItem value="taller">Reparación en taller</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="urgency"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Urgencia *</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Seleccionar prioridad" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="baja">Baja</SelectItem>
-                              <SelectItem value="normal">Normal</SelectItem>
-                              <SelectItem value="alta">Alta</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <FormField
-                    control={form.control}
-                    name="observations"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Observaciones adicionales</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            {...field}
-                            placeholder="Cualquier información adicional relevante para el servicio"
-                            rows={4}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </CardContent>
-                <CardFooter className="flex justify-between">
-                  <p className="text-sm text-notion-gray">
-                    * Campos obligatorios
-                  </p>
-                  <Button type="submit" className="notion-button" disabled={createMutation.isPending || updateMutation.isPending}>
-                    <Save className="mr-2 h-4 w-4" />
-                    {createMutation.isPending || updateMutation.isPending ? "Guardando..." : "Guardar Orden"}
-                  </Button>
-                </CardFooter>
-              </Card>
-            </TabsContent>
+                          Anterior
+                        </Button>
+                        
+                        <Button 
+                          type="submit"
+                          disabled={createMutation.isPending || updateMutation.isPending}
+                        >
+                          {(createMutation.isPending || updateMutation.isPending) && (
+                            <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-b-transparent"></span>
+                          )}
+                          <Save className={`mr-2 h-4 w-4 ${createMutation.isPending || updateMutation.isPending ? 'hidden' : ''}`} />
+                          {isEditMode ? "Actualizar Orden" : "Crear Orden"}
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  </TabsContent>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </Tabs>
         </form>
       </Form>

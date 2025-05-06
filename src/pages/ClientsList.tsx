@@ -1,11 +1,10 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { clientsApi } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -14,18 +13,61 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Card } from "@/components/ui/card";
-import { Search, Plus, FileText, Edit, Trash, MoreHorizontal, CalendarDays } from "lucide-react";
+import { Search, Plus, FileText, Edit, Trash, MoreHorizontal, CalendarDays, Phone, Mail, MapPin, UserRound } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  AlertDialog,
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 export default function ClientsList() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
-  
+  const [clientToDelete, setClientToDelete] = useState<any>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const { toast } = useToast();
+
   // Fetch clients
-  const { data: clients, isLoading } = useQuery({
+  const { data: clients, isLoading, refetch } = useQuery({
     queryKey: ["clients"],
     queryFn: clientsApi.getAll,
   });
-  
+
+  // Delete client function
+  const handleDeleteClient = async (id: string, name: string) => {
+    try {
+      await clientsApi.delete(id);
+      toast({
+        title: "Cliente eliminado",
+        description: `${name} ha sido eliminado correctamente`,
+      });
+      refetch();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el cliente",
+        variant: "destructive",
+      });
+    } finally {
+      setShowDeleteDialog(false);
+      setClientToDelete(null);
+    }
+  };
+
+  const confirmDelete = (client: any) => {
+    setClientToDelete(client);
+    setShowDeleteDialog(true);
+  };
+
   const filteredClients = clients?.filter((client) =>
     client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -34,44 +76,60 @@ export default function ClientsList() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <h1 className="notion-heading">Clientes</h1>
-        <Button className="notion-button" onClick={() => navigate("/clients/new")}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold">Clientes</h1>
+        <Button onClick={() => navigate("/clients/new")}>
           <Plus className="mr-2 h-4 w-4" />
           Nuevo Cliente
         </Button>
       </div>
-
+      
       <div className="relative">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-notion-gray" />
-        <Input
-          type="search"
-          placeholder="Buscar por nombre, correo o teléfono..."
-          className="pl-8"
-          value={searchTerm}
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input 
+          type="search" 
+          placeholder="Buscar por nombre, correo o teléfono..." 
+          className="pl-10" 
+          value={searchTerm} 
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
-
+      
       {isLoading ? (
-        <div className="flex justify-center p-8">Cargando clientes...</div>
+        <div className="flex justify-center p-8">
+          <div className="flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="mt-4 text-muted-foreground">Cargando clientes...</p>
+          </div>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredClients.map((client) => (
-            <Card key={client.id} className="notion-card overflow-hidden">
-              <div className="p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h3 className="text-lg font-medium">{client.name}</h3>
-                    <p className="text-sm text-notion-gray">{client.id.split('-')[0].toUpperCase()}</p>
+            <Card 
+              key={client.id} 
+              className="overflow-hidden hover-card transition-all border bg-card"
+            >
+              <div className="p-5">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <UserRound className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold line-clamp-1">{client.name}</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Cliente desde {format(new Date(client.created_at), "MMM yyyy", { locale: es })}
+                      </p>
+                    </div>
                   </div>
+                  
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="w-[180px]">
                       <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => navigate(`/clients/${client.id}`)}>
@@ -87,54 +145,97 @@ export default function ClientsList() {
                         Agendar servicio
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-red-600" onClick={() => navigate(`/clients/${client.id}`)}>
+                      <DropdownMenuItem 
+                        className="text-destructive focus:text-destructive" 
+                        onClick={() => confirmDelete(client)}
+                      >
                         <Trash className="mr-2 h-4 w-4" />
                         Eliminar
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-                
-                <div className="space-y-1">
-                  <p className="text-sm flex items-center">
-                    <span className="inline-block w-20 text-notion-gray">Email:</span>
-                    <span>{client.email || "No registrado"}</span>
-                  </p>
-                  <p className="text-sm flex items-center">
-                    <span className="inline-block w-20 text-notion-gray">Teléfono:</span>
-                    <span>{client.phone || "No registrado"}</span>
-                  </p>
-                  <p className="text-sm flex items-start">
-                    <span className="inline-block w-20 text-notion-gray">Dirección:</span>
-                    <span className="flex-1">{client.address || "No registrada"}</span>
-                  </p>
+
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center text-sm">
+                    <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
+                    <span>{client.phone || "Teléfono no registrado"}</span>
+                  </div>
+                  <div className="flex items-center text-sm">
+                    <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
+                    <span className="truncate">{client.email || "Email no registrado"}</span>
+                  </div>
+                  <div className="flex items-start text-sm">
+                    <MapPin className="h-4 w-4 mr-2 text-muted-foreground shrink-0 mt-0.5" />
+                    <span className="line-clamp-2">{client.address || "Dirección no registrada"}</span>
+                  </div>
                 </div>
               </div>
               
-              <div className="bg-notion-lightgray px-4 py-3 flex justify-between items-center">
-                <div className="text-sm">
-                  <span className="text-notion-gray">Creado: </span>
-                  <span>{new Date(client.created_at).toLocaleDateString()}</span>
-                </div>
-                <Link 
-                  to={`/orders/new?clientId=${client.id}`}
-                  className="text-sm text-notion-blue hover:underline"
+              <div className="px-5 py-3 bg-muted/40 flex justify-between items-center border-t">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => navigate(`/clients/${client.id}`)}
+                  className="gap-1 hover:text-primary h-8"
                 >
-                  Nueva orden
-                </Link>
+                  <FileText className="h-4 w-4" />
+                  <span>Detalles</span>
+                </Button>
+                <Button 
+                  size="sm" 
+                  onClick={() => navigate(`/orders/new?clientId=${client.id}`)}
+                  className="gap-1 h-8"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Nueva orden</span>
+                </Button>
               </div>
             </Card>
           ))}
         </div>
       )}
-      
+
       {filteredClients.length === 0 && !isLoading && (
-        <div className="text-center py-8">
-          <p className="text-notion-gray">
-            No se encontraron clientes que coincidan con la búsqueda.
+        <div className="flex flex-col items-center justify-center p-12 text-center bg-muted/20 rounded-lg border border-dashed">
+          <UserRound className="h-12 w-12 text-muted-foreground opacity-20" />
+          <h3 className="mt-4 text-lg font-medium">No se encontraron clientes</h3>
+          <p className="mt-2 text-sm text-muted-foreground max-w-md">
+            {searchTerm 
+              ? `No hay resultados para "${searchTerm}". Intenta con otro término de búsqueda.` 
+              : "No hay clientes registrados en el sistema. ¡Crea tu primer cliente!"}
           </p>
+          <Button 
+            onClick={() => navigate("/clients/new")}
+            className="mt-4"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Cliente
+          </Button>
         </div>
       )}
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente el cliente
+              <span className="font-semibold"> {clientToDelete?.name}</span>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => handleDeleteClient(clientToDelete?.id, clientToDelete?.name)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

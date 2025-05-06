@@ -1,10 +1,12 @@
-
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { serviceOrdersApi, clientsApi, applianceTypesApi, brandsApi } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { DataTable } from "@/components/ui/data-table";
+import { SectionHeader } from "@/components/ui/section-header";
 import { 
   Select,
   SelectContent,
@@ -21,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Search, Plus, Filter, MoreHorizontal, FileText, Printer, Edit, Trash } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function OrdersList() {
   const navigate = useNavigate();
@@ -67,7 +70,8 @@ export default function OrdersList() {
     const matchesSearch =
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       getClientName(order.client_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      getApplianceName(order.appliance_type, order.brand_id).toLowerCase().includes(searchTerm.toLowerCase());
+      getApplianceName(order.appliance_type, order.brand_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (order.problem_description && order.problem_description.toLowerCase().includes(searchTerm.toLowerCase()));
 
     // Aplicar filtro de estado
     const matchesStatus =
@@ -75,32 +79,105 @@ export default function OrdersList() {
 
     return matchesSearch && matchesStatus;
   }) || [];
+  
+  const columns = [
+    {
+      header: "Nº Orden",
+      accessorKey: "order_number",
+      cell: (item: any) => (
+        <span className="font-medium">{item.order_number}</span>
+      ),
+    },
+    {
+      header: "Cliente",
+      cell: (item: any) => getClientName(item.client_id),
+    },
+    {
+      header: "Electrodoméstico",
+      cell: (item: any) => getApplianceName(item.appliance_type, item.brand_id),
+    },
+    {
+      header: "Problema",
+      cell: (item: any) => (
+        <span className="line-clamp-1">{item.problem_description}</span>
+      ),
+    },
+    {
+      header: "Fecha",
+      cell: (item: any) => new Date(item.created_at).toLocaleDateString(),
+    },
+    {
+      header: "Estado",
+      cell: (item: any) => (
+        <StatusBadge 
+          status={item.status as any} 
+          className="text-xs"
+        />
+      ),
+    },
+    {
+      header: "Acciones",
+      cell: (item: any) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate(`/orders/${item.id}`)}>
+              <FileText className="mr-2 h-4 w-4" />
+              Ver detalles
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(`/orders/${item.id}/edit`)}>
+              <Edit className="mr-2 h-4 w-4" />
+              Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(`/orders/${item.id}/print`)}>
+              <Printer className="mr-2 h-4 w-4" />
+              Imprimir
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              className="text-destructive focus:text-destructive"
+              onClick={() => navigate(`/orders/${item.id}`)}
+            >
+              <Trash className="mr-2 h-4 w-4" />
+              Eliminar
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+      className: "text-right",
+    },
+  ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <h1 className="notion-heading">Órdenes de Servicio</h1>
-        <Button className="notion-button" onClick={() => navigate("/orders/new")}>
-          <Plus className="mr-2 h-4 w-4" />
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <SectionHeader title="Órdenes de Servicio">
+        <Button onClick={() => navigate("/orders/new")} className="h-9 gap-1">
+          <Plus className="h-4 w-4" />
           Nueva Orden
         </Button>
-      </div>
+      </SectionHeader>
 
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-4 mb-2">
         <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-notion-gray" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
             placeholder="Buscar por número, cliente o electrodoméstico..."
-            className="pl-8"
+            className="pl-9 transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="w-full sm:w-48">
+        <div className="w-full sm:w-56">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger>
-              <Filter className="mr-2 h-4 w-4" />
+            <SelectTrigger className="w-full transition-all">
+              <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
               <SelectValue placeholder="Filtrar por estado" />
             </SelectTrigger>
             <SelectContent>
@@ -113,111 +190,20 @@ export default function OrdersList() {
         </div>
       </div>
 
-      <div className="bg-white border border-notion-border rounded-md overflow-hidden">
-        <div className="overflow-x-auto">
-          {isLoadingOrders ? (
-            <div className="text-center py-8">Cargando órdenes de servicio...</div>
-          ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="bg-notion-lightgray">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-notion-gray">
-                    Nº Orden
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-notion-gray">
-                    Cliente
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-notion-gray">
-                    Electrodoméstico
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-notion-gray">
-                    Problema
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-notion-gray">
-                    Fecha
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-notion-gray">
-                    Estado
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-notion-gray">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-notion-border">
-                {filteredOrders.map((order) => (
-                  <tr
-                    key={order.id}
-                    className="hover:bg-notion-lightgray transition-colors"
-                  >
-                    <td className="px-4 py-3 text-sm font-medium">
-                      {order.order_number}
-                    </td>
-                    <td className="px-4 py-3 text-sm">{getClientName(order.client_id)}</td>
-                    <td className="px-4 py-3 text-sm">{getApplianceName(order.appliance_type, order.brand_id)}</td>
-                    <td className="px-4 py-3 text-sm">
-                      {order.problem_description.length > 50
-                        ? `${order.problem_description.substring(0, 50)}...`
-                        : order.problem_description}
-                    </td>
-                    <td className="px-4 py-3 text-sm">{new Date(order.created_at).toLocaleDateString()}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          order.status === "Completado"
-                            ? "bg-green-100 text-green-800"
-                            : order.status === "En proceso"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-yellow-100 text-yellow-800"
-                        }`}
-                      >
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => navigate(`/orders/${order.id}`)}>
-                            <FileText className="mr-2 h-4 w-4" />
-                            Ver detalles
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => navigate(`/orders/${order.id}/edit`)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => navigate(`/orders/${order.id}/print`)}>
-                            <Printer className="mr-2 h-4 w-4" />
-                            Imprimir
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600" onClick={() => navigate(`/orders/${order.id}`)}>
-                            <Trash className="mr-2 h-4 w-4" />
-                            Eliminar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          {!isLoadingOrders && filteredOrders.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-notion-gray">
-                No se encontraron órdenes que coincidan con la búsqueda.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <DataTable
+          columns={columns}
+          data={filteredOrders}
+          isLoading={isLoadingOrders}
+          noDataMessage="No se encontraron órdenes que coincidan con la búsqueda."
+          keyExtractor={(item) => item.id}
+          className="shadow-sm border-border"
+        />
+      </motion.div>
     </div>
   );
 }

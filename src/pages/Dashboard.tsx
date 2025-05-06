@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarDays, ClipboardCheck, DollarSign, UserRound } from "lucide-react";
@@ -50,25 +49,25 @@ export default function Dashboard() {
     {
       title: "Órdenes Activas",
       value: activeOrders.length.toString(),
-      icon: <ClipboardCheck className="h-6 w-6 text-notion-blue" />,
+      icon: <ClipboardCheck className="h-6 w-6 text-primary" />,
       description: `${pendingOrders.length} pendientes de revisión`,
     },
     {
       title: "Clientes Registrados",
       value: totalClients.toString(),
-      icon: <UserRound className="h-6 w-6 text-notion-blue" />,
+      icon: <UserRound className="h-6 w-6 text-primary" />,
       description: `${newClientsThisMonth} nuevos este mes`,
     },
     {
       title: "Servicios Agendados",
       value: upcomingAppointments.toString(),
-      icon: <CalendarDays className="h-6 w-6 text-notion-blue" />,
+      icon: <CalendarDays className="h-6 w-6 text-primary" />,
       description: "Próximos 7 días",
     },
     {
       title: "Ingresos del Mes",
       value: `$${currentMonthEarnings}`,
-      icon: <DollarSign className="h-6 w-6 text-notion-blue" />,
+      icon: <DollarSign className="h-6 w-6 text-primary" />,
       description: "+12% vs. mes anterior",
     },
   ];
@@ -76,15 +75,15 @@ export default function Dashboard() {
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="flex items-center justify-between">
-        <h1 className="notion-heading">Panel de Control</h1>
-        <Button className="notion-button">
+        <h1 className="text-2xl font-bold">Panel de Control</h1>
+        <Button>
           <Link to="/orders/new">Nueva Orden</Link>
         </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
-          <Card key={index} className="notion-card">
+          <Card key={index} className="hover-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
                 {stat.title}
@@ -93,7 +92,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-notion-gray mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {stat.description}
               </p>
             </CardContent>
@@ -101,7 +100,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <Card className="notion-card">
+      <Card className="hover-card">
         <CardHeader>
           <CardTitle>Órdenes Recientes</CardTitle>
           <CardDescription>
@@ -112,52 +111,47 @@ export default function Dashboard() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-notion-border">
-                  <th className="px-4 py-2 text-left text-xs font-medium text-notion-gray">
+                <tr className="border-b">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
                     Nº Orden
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-notion-gray">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
                     Cliente
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-notion-gray">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
                     Fecha
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-notion-gray">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
                     Estado
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-notion-gray">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
                     Acciones
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {orders?.slice(0, 4).map((order) => (
-                  <tr
-                    key={order.id}
-                    className="border-b border-notion-border hover:bg-notion-lightgray"
-                  >
+                  <tr key={order.id} className="border-b hover:bg-muted/50">
                     <td className="px-4 py-3 text-sm">{order.order_number}</td>
                     <td className="px-4 py-3 text-sm">
                       {clients?.find(c => c.id === order.client_id)?.name || "Cliente"}
                     </td>
                     <td className="px-4 py-3 text-sm">{new Date(order.created_at).toLocaleDateString()}</td>
                     <td className="px-4 py-3 text-sm">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          order.status === "Completado"
-                            ? "bg-green-100 text-green-800"
-                            : order.status === "En proceso"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-yellow-100 text-yellow-800"
-                        }`}
-                      >
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        order.status === "Completado"
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                          : order.status === "En proceso"
+                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                          : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                      }`}>
                         {order.status}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <Link
                         to={`/orders/${order.id}`}
-                        className="text-notion-blue hover:underline"
+                        className="text-primary hover:underline"
                       >
                         Ver detalles
                       </Link>
@@ -166,7 +160,7 @@ export default function Dashboard() {
                 ))}
                 {!orders || orders.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-3 text-sm text-center text-notion-gray">
+                    <td colSpan={5} className="px-4 py-3 text-sm text-center text-muted-foreground">
                       No hay órdenes registradas
                     </td>
                   </tr>
@@ -175,10 +169,7 @@ export default function Dashboard() {
             </table>
           </div>
           <div className="mt-4 text-center">
-            <Link
-              to="/orders"
-              className="text-sm text-notion-blue hover:underline"
-            >
+            <Link to="/orders" className="text-sm text-primary hover:underline">
               Ver todas las órdenes
             </Link>
           </div>

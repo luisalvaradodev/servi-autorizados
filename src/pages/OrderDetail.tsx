@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -10,7 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { SectionHeader } from "@/components/ui/section-header";
+import { InfoGroup } from "@/components/ui/info-group";
 import { CalendarDays, Clock, Edit, FileText, Printer, User, ArrowLeft, Plus, Trash, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -24,6 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { motion } from "framer-motion";
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -199,7 +201,7 @@ export default function OrderDetail() {
   // Set initial values
   useEffect(() => {
     if (order) {
-      setDiagnosis(order.observations || "");
+      setDiagnosis(order.diagnosis || "");
       setObservations(order.observations || "");
     }
     
@@ -216,7 +218,8 @@ export default function OrderDetail() {
   
   const handleSaveChanges = () => {
     updateDetailsMutation.mutate({
-      observations: observations,
+      diagnosis,
+      observations,
     });
   };
   
@@ -276,532 +279,672 @@ export default function OrderDetail() {
   const total = subtotal + tax;
   
   if (isLoadingOrder || (order && isLoadingClient)) {
-    return <div className="flex justify-center p-8">Cargando información de la orden...</div>;
+    return (
+      <div className="flex justify-center items-center min-h-[70vh]">
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+          <p className="text-muted-foreground">Cargando información de la orden...</p>
+        </div>
+      </div>
+    );
   }
   
   if (!order) {
-    return <div className="flex justify-center p-8">No se encontró la orden de servicio</div>;
+    return (
+      <div className="flex justify-center items-center min-h-[70vh]">
+        <div className="flex flex-col items-center">
+          <div className="text-3xl mb-2">🔍</div>
+          <h2 className="text-xl font-semibold mb-2">Orden no encontrada</h2>
+          <p className="text-muted-foreground mb-4">No se encontró la orden de servicio solicitada</p>
+          <Button onClick={() => navigate("/orders")}>
+            Volver al listado
+          </Button>
+        </div>
+      </div>
+    );
   }
   
   const applianceType = applianceTypes?.find(type => type.id === order.appliance_type);
   const brand = brands?.find(b => b.id === order.brand_id);
 
   return (
-    <div className="container mx-auto pb-10">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/orders")}
-          >
-            <ArrowLeft className="h-5 w-5" />
+    <div className="container mx-auto pb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <SectionHeader
+        title={`Orden #${order.order_number}`}
+        subtitle={`Creada el ${new Date(order.created_at).toLocaleDateString()}`}
+        onBack={() => navigate("/orders")}
+      >
+        <Link to={`/orders/${id}/edit`}>
+          <Button variant="outline" size="sm" className="h-9">
+            <Edit className="mr-2 h-4 w-4" />
+            Editar
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Orden de servicio #{order.order_number}</h1>
-            <p className="text-muted-foreground">Creada el {new Date(order.created_at).toLocaleDateString()}</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Link to={`/orders/${id}/edit`}>
-            <Button variant="outline">
-              <Edit className="mr-2 h-4 w-4" />
-              Editar
+        </Link>
+        <Link to={`/orders/${id}/print`}>
+          <Button size="sm" className="h-9">
+            <Printer className="mr-2 h-4 w-4" />
+            Imprimir
+          </Button>
+        </Link>
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" size="sm" className="h-9">
+              <Trash className="mr-2 h-4 w-4" />
+              Eliminar
             </Button>
-          </Link>
-          <Link to={`/orders/${id}/print`}>
-            <Button>
-              <Printer className="mr-2 h-4 w-4" />
-              Imprimir
-            </Button>
-          </Link>
-          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive">
-                <Trash className="mr-2 h-4 w-4" />
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. Se eliminará permanentemente esta
+                orden de servicio y todos los datos relacionados.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteOrder} className="bg-destructive text-destructive-foreground">
                 Eliminar
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Esta acción no se puede deshacer. Se eliminará permanentemente esta
-                  orden de servicio y todos los datos relacionados.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteOrder} className="bg-destructive text-destructive-foreground">
-                  Eliminar
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </div>
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </SectionHeader>
 
-      <div className="flex gap-6 mb-6">
-        <Card className="w-2/3">
-          <CardHeader className="pb-2">
-            <CardTitle>Estado de la orden</CardTitle>
-            <CardDescription>Estado actual y opciones de actualización</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <Badge variant={
-                order.status === "Completado" ? "outline" :
-                order.status === "En proceso" ? "default" :
-                "secondary"
-              }>
-                {order.status}
-              </Badge>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => handleUpdateStatus("Pendiente")}>Marcar pendiente</Button>
-                <Button variant="outline" onClick={() => handleUpdateStatus("En proceso")}>Marcar en proceso</Button>
-                <Button variant="default" onClick={() => handleUpdateStatus("Completado")}>Marcar como completada</Button>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="md:col-span-2"
+        >
+          <Card className="overflow-hidden">
+            <CardHeader className="bg-muted/50 pb-3">
+              <CardTitle className="text-lg">Estado de la orden</CardTitle>
+              <CardDescription>Estado actual y opciones de actualización</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <StatusBadge 
+                  status={order.status as any} 
+                  className="text-sm px-3 py-1 h-auto"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleUpdateStatus("Pendiente")}
+                    className="h-9 transition-all"
+                  >
+                    Marcar pendiente
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleUpdateStatus("En proceso")}
+                    className="h-9 transition-all"
+                  >
+                    Marcar en proceso
+                  </Button>
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    onClick={() => handleUpdateStatus("Completado")}
+                    className="h-9 transition-all"
+                  >
+                    Marcar completado
+                  </Button>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card className="w-1/3">
-          <CardHeader className="pb-2">
-            <CardTitle>Servicio programado</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {appointment ? (
-              <div className="flex flex-col space-y-1">
-                <div className="flex items-center text-sm">
-                  <CalendarDays className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <span>{new Date(appointment.date).toLocaleDateString()}</span>
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+          className="md:col-span-1"
+        >
+          <Card className="h-full">
+            <CardHeader className="bg-muted/50 pb-3">
+              <CardTitle className="text-lg">Servicio programado</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {appointment ? (
+                <div className="flex flex-col space-y-3">
+                  <InfoGroup
+                    label="Fecha"
+                    value={new Date(appointment.date).toLocaleDateString()}
+                    icon={<CalendarDays className="h-4 w-4 text-muted-foreground" />}
+                  />
+                  <InfoGroup
+                    label="Horario"
+                    value={appointment.time_slot}
+                    icon={<Clock className="h-4 w-4 text-muted-foreground" />}
+                  />
+                  <InfoGroup
+                    label="Técnico"
+                    value={appointment.technician || "No asignado"}
+                    icon={<User className="h-4 w-4 text-muted-foreground" />}
+                  />
                 </div>
-                <div className="flex items-center text-sm">
-                  <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <span>{appointment.time_slot}</span>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-24 text-center">
+                  <p className="text-sm text-muted-foreground mb-2">No hay cita programada</p>
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveTab("device")}
+                    className="mt-2"
+                  >
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    Programar ahora
+                  </Button>
                 </div>
-                <div className="flex items-center text-sm">
-                  <User className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <span>Técnico: {appointment.technician || "No asignado"}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground text-center">
-                No hay cita programada para esta orden
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="details">Detalles</TabsTrigger>
-          <TabsTrigger value="client">Cliente</TabsTrigger>
-          <TabsTrigger value="device">Electrodoméstico</TabsTrigger>
-          <TabsTrigger value="service">Servicio y Repuestos</TabsTrigger>
-          <TabsTrigger value="payment">Pago y Facturación</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 mb-6">
+          <TabsTrigger value="details" className="text-sm">Detalles</TabsTrigger>
+          <TabsTrigger value="client" className="text-sm">Cliente</TabsTrigger>
+          <TabsTrigger value="device" className="text-sm">Electrodoméstico</TabsTrigger>
+          <TabsTrigger value="service" className="text-sm">Servicio y Repuestos</TabsTrigger>
+          <TabsTrigger value="payment" className="text-sm">Pago y Facturación</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="details" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Detalles de la Orden</CardTitle>
-              <CardDescription>Información general sobre la orden de servicio</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+        <TabsContent value="details">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card>
+              <CardHeader className="bg-muted/50">
+                <CardTitle>Detalles de la Orden</CardTitle>
+                <CardDescription>Información general sobre la orden de servicio</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="issue" className="text-sm font-medium">Problema reportado</Label>
+                    <Textarea 
+                      id="issue" 
+                      value={order.problem_description} 
+                      readOnly 
+                      className="h-32 resize-none bg-muted/40"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="diagnosis" className="text-sm font-medium">Diagnóstico</Label>
+                    <Textarea 
+                      id="diagnosis" 
+                      value={diagnosis}
+                      onChange={(e) => setDiagnosis(e.target.value)}
+                      className="h-32 resize-none transition-all focus:border-primary"
+                      placeholder="Ingrese el diagnóstico del técnico"
+                    />
+                  </div>
+                </div>
                 <div className="space-y-2">
-                  <Label htmlFor="issue">Problema reportado</Label>
+                  <Label htmlFor="observations" className="text-sm font-medium">Observaciones</Label>
                   <Textarea 
-                    id="issue" 
-                    value={order.problem_description} 
-                    readOnly 
-                    className="h-24"
+                    id="observations" 
+                    value={observations}
+                    onChange={(e) => setObservations(e.target.value)}
+                    className="h-32 resize-none transition-all focus:border-primary"
+                    placeholder="Agregue observaciones adicionales"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="diagnosis">Diagnóstico</Label>
-                  <Textarea 
-                    id="diagnosis" 
-                    value={diagnosis}
-                    onChange={(e) => setDiagnosis(e.target.value)}
-                    className="h-24"
-                    placeholder="Ingrese el diagnóstico del técnico"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="observations">Observaciones</Label>
-                <Textarea 
-                  id="observations" 
-                  value={observations}
-                  onChange={(e) => setObservations(e.target.value)}
-                  className="h-24"
-                  placeholder="Agregue observaciones adicionales"
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button onClick={handleSaveChanges}>Guardar cambios</Button>
-            </CardFooter>
-          </Card>
+              </CardContent>
+              <CardFooter className="bg-muted/30 py-3 flex justify-end">
+                <Button 
+                  onClick={handleSaveChanges}
+                  disabled={updateDetailsMutation.isPending}
+                  className="transition-all"
+                >
+                  {updateDetailsMutation.isPending && (
+                    <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-b-transparent"></span>
+                  )}
+                  {updateDetailsMutation.isPending ? 'Guardando...' : 'Guardar cambios'}
+                </Button>
+              </CardFooter>
+            </Card>
+          </motion.div>
         </TabsContent>
 
-        <TabsContent value="client" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Información del Cliente</CardTitle>
-              <CardDescription>Datos de contacto del cliente</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {client ? (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="clientName">Nombre</Label>
-                      <Input id="clientName" value={client.name} readOnly />
+        <TabsContent value="client">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card>
+              <CardHeader className="bg-muted/50">
+                <CardTitle>Información del Cliente</CardTitle>
+                <CardDescription>Datos de contacto del cliente</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                {client ? (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <InfoGroup
+                          label="Nombre completo"
+                          value={client.name}
+                        />
+                        <InfoGroup
+                          label="Teléfono"
+                          value={client.phone || ""}
+                        />
+                      </div>
+                      <div className="space-y-4">
+                        <InfoGroup
+                          label="Correo electrónico"
+                          value={client.email || ""}
+                        />
+                        <InfoGroup
+                          label="Dirección"
+                          value={client.address || ""}
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="clientPhone">Teléfono</Label>
-                      <Input id="clientPhone" value={client.phone || ""} readOnly />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="clientEmail">Correo electrónico</Label>
-                    <Input id="clientEmail" value={client.email || ""} readOnly />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="clientAddress">Dirección</Label>
-                    <Textarea id="clientAddress" value={client.address || ""} readOnly />
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-4 text-muted-foreground">
-                  No se encontró información del cliente
-                </div>
-              )}
-            </CardContent>
-            <CardFooter>
-              {client && (
-                <Link to={`/clients/${client.id}`}>
-                  <Button variant="outline">
-                    <FileText className="mr-2 h-4 w-4" />
-                    Ver perfil completo
-                  </Button>
-                </Link>
-              )}
-            </CardFooter>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="device" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Información del Electrodoméstico</CardTitle>
-              <CardDescription>Detalles técnicos del dispositivo</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="deviceType">Tipo</Label>
-                  <Input id="deviceType" value={applianceType?.name || ""} readOnly />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="deviceBrand">Marca</Label>
-                  <Input id="deviceBrand" value={brand?.name || ""} readOnly />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="deviceModel">Modelo</Label>
-                  <Input id="deviceModel" value={order.model || ""} readOnly />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="deviceSerial">Número de serie</Label>
-                  <Input id="deviceSerial" value={order.serial_number || ""} readOnly />
-                </div>
-              </div>
-              
-              <div className="mt-6">
-                <h3 className="text-lg font-medium mb-4">Programar Servicio</h3>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="appointmentDate">Fecha</Label>
-                    <Input 
-                      id="appointmentDate" 
-                      type="date" 
-                      value={appointmentDate}
-                      onChange={(e) => setAppointmentDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="appointmentTime">Hora</Label>
-                    <Input 
-                      id="appointmentTime" 
-                      type="text" 
-                      value={appointmentTime}
-                      onChange={(e) => setAppointmentTime(e.target.value)}
-                      placeholder="Ej: 9:00 - 12:00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="appointmentTechnician">Técnico asignado</Label>
-                    <Input 
-                      id="appointmentTechnician" 
-                      value={appointmentTechnician}
-                      onChange={(e) => setAppointmentTechnician(e.target.value)}
-                      placeholder="Nombre del técnico"
-                    />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <Button onClick={handleSaveAppointment}>
-                    <CalendarDays className="mr-2 h-4 w-4" />
-                    {appointment ? "Actualizar cita" : "Programar cita"}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="service" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Servicio y Repuestos</CardTitle>
-              <CardDescription>Trabajo realizado y materiales utilizados</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium mb-2">Mano de obra</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                  <div className="md:col-span-2">
-                    <Input 
-                      placeholder="Descripción del trabajo" 
-                      value={newLabor.description}
-                      onChange={(e) => setNewLabor({...newLabor, description: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Input 
-                      type="number" 
-                      placeholder="Horas" 
-                      min="0.5" 
-                      step="0.5"
-                      value={newLabor.hours}
-                      onChange={(e) => setNewLabor({...newLabor, hours: parseFloat(e.target.value)})}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Input 
-                      type="number" 
-                      placeholder="Tarifa $" 
-                      min="1"
-                      value={newLabor.rate}
-                      onChange={(e) => setNewLabor({...newLabor, rate: parseFloat(e.target.value)})}
-                    />
-                    <Button size="icon" onClick={handleAddLabor}>
-                      <Plus className="h-4 w-4" />
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <p className="text-muted-foreground mb-4">No se encontró información del cliente</p>
+                    <Button variant="outline" onClick={() => navigate("/clients/new")}>
+                      Registrar nuevo cliente
                     </Button>
+                  </div>
+                )}
+              </CardContent>
+              <CardFooter className="bg-muted/30 py-3 flex justify-end">
+                {client && (
+                  <Link to={`/clients/${client.id}`}>
+                    <Button variant="outline">
+                      <FileText className="mr-2 h-4 w-4" />
+                      Ver perfil completo
+                    </Button>
+                  </Link>
+                )}
+              </CardFooter>
+            </Card>
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="device">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card>
+              <CardHeader className="bg-muted/50">
+                <CardTitle>Información del Electrodoméstico</CardTitle>
+                <CardDescription>Detalles técnicos del dispositivo</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <InfoGroup
+                      label="Tipo de electrodoméstico"
+                      value={applianceType?.name || ""}
+                    />
+                    <InfoGroup
+                      label="Modelo"
+                      value={order.model || ""}
+                    />
+                  </div>
+                  <div className="space-y-4">
+                    <InfoGroup
+                      label="Marca"
+                      value={brand?.name || ""}
+                    />
+                    <InfoGroup
+                      label="Número de serie"
+                      value={order.serial_number || ""}
+                    />
                   </div>
                 </div>
                 
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-muted text-muted-foreground text-sm">
-                      <th className="p-2 text-left">Descripción</th>
-                      <th className="p-2 text-right">Horas</th>
-                      <th className="p-2 text-right">Tarifa</th>
-                      <th className="p-2 text-right">Subtotal</th>
-                      <th className="p-2 text-center">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {labor?.map((item) => (
-                      <tr key={item.id} className="border-b border-muted">
-                        <td className="p-2">{item.description}</td>
-                        <td className="p-2 text-right">{item.hours}</td>
-                        <td className="p-2 text-right">${item.rate.toFixed(2)}</td>
-                        <td className="p-2 text-right">${(item.hours * item.rate).toFixed(2)}</td>
-                        <td className="p-2 text-center">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => deleteLaborMutation.mutate(item.id)}
-                          >
-                            <Trash className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                    {(!labor || labor.length === 0) && (
-                      <tr>
-                        <td colSpan={5} className="p-2 text-center text-muted-foreground">
-                          No hay registros de mano de obra
-                        </td>
-                      </tr>
-                    )}
-                    <tr>
-                      <td colSpan={3} className="p-2 text-right font-medium">Total Mano de Obra:</td>
-                      <td className="p-2 text-right font-medium">${laborTotal.toFixed(2)}</td>
-                      <td></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-medium mb-2">Repuestos utilizados</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                  <div className="md:col-span-2">
-                    <Input 
-                      placeholder="Descripción del repuesto" 
-                      value={newPart.description}
-                      onChange={(e) => setNewPart({...newPart, description: e.target.value})}
-                    />
+                <div className="mt-8">
+                  <h3 className="text-lg font-medium mb-4">Programar Servicio</h3>
+                  <div className="bg-muted/30 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="appointmentDate" className="text-sm">Fecha</Label>
+                        <Input 
+                          id="appointmentDate" 
+                          type="date" 
+                          value={appointmentDate}
+                          onChange={(e) => setAppointmentDate(e.target.value)}
+                          className="transition-all"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="appointmentTime" className="text-sm">Hora</Label>
+                        <Input 
+                          id="appointmentTime" 
+                          type="text" 
+                          value={appointmentTime}
+                          onChange={(e) => setAppointmentTime(e.target.value)}
+                          placeholder="Ej: 9:00 - 12:00"
+                          className="transition-all"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="appointmentTechnician" className="text-sm">Técnico asignado</Label>
+                        <Input 
+                          id="appointmentTechnician" 
+                          value={appointmentTechnician}
+                          onChange={(e) => setAppointmentTechnician(e.target.value)}
+                          placeholder="Nombre del técnico"
+                          className="transition-all"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-4 flex justify-end">
+                      <Button 
+                        onClick={handleSaveAppointment}
+                        disabled={updateAppointmentMutation.isPending}
+                        size="sm"
+                      >
+                        {updateAppointmentMutation.isPending && (
+                          <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-b-transparent"></span>
+                        )}
+                        <CalendarDays className={`mr-2 h-4 w-4 ${updateAppointmentMutation.isPending ? 'hidden' : ''}`} />
+                        {appointment ? "Actualizar cita" : "Programar cita"}
+                      </Button>
+                    </div>
                   </div>
-                  <div>
-                    <Input 
-                      type="number" 
-                      placeholder="Cantidad" 
-                      min="1"
-                      value={newPart.quantity}
-                      onChange={(e) => setNewPart({...newPart, quantity: parseInt(e.target.value)})}
-                    />
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="service">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card>
+              <CardHeader className="bg-muted/50">
+                <CardTitle>Servicio y Repuestos</CardTitle>
+                <CardDescription>Trabajo realizado y materiales utilizados</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-8">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium">Mano de obra</h3>
                   </div>
-                  <div className="flex gap-2">
-                    <Input 
-                      type="number" 
-                      placeholder="Precio $" 
-                      min="0.01"
-                      step="0.01"
-                      value={newPart.unit_price}
-                      onChange={(e) => setNewPart({...newPart, unit_price: parseFloat(e.target.value)})}
-                    />
-                    <Button size="icon" onClick={handleAddPart}>
-                      <Plus className="h-4 w-4" />
-                    </Button>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4 bg-muted/30 p-3 rounded-md">
+                    <div className="md:col-span-2">
+                      <Input 
+                        placeholder="Descripción del trabajo" 
+                        value={newLabor.description}
+                        onChange={(e) => setNewLabor({...newLabor, description: e.target.value})}
+                        className="transition-all"
+                      />
+                    </div>
+                    <div>
+                      <Input 
+                        type="number" 
+                        placeholder="Horas" 
+                        min="0.5" 
+                        step="0.5"
+                        value={newLabor.hours}
+                        onChange={(e) => setNewLabor({...newLabor, hours: parseFloat(e.target.value)})}
+                        className="transition-all"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Input 
+                        type="number" 
+                        placeholder="Tarifa $" 
+                        min="1"
+                        value={newLabor.rate}
+                        onChange={(e) => setNewLabor({...newLabor, rate: parseFloat(e.target.value)})}
+                        className="transition-all"
+                      />
+                      <Button size="icon" onClick={handleAddLabor} className="shrink-0">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="rounded-md border overflow-hidden">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-muted">
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Descripción</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Horas</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Tarifa</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Subtotal</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-muted-foreground w-16">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {labor?.map((item) => (
+                          <tr key={item.id} className="bg-card">
+                            <td className="px-4 py-2 text-sm">{item.description}</td>
+                            <td className="px-4 py-2 text-sm text-right">{item.hours}</td>
+                            <td className="px-4 py-2 text-sm text-right">${item.rate.toFixed(2)}</td>
+                            <td className="px-4 py-2 text-sm text-right">${(item.hours * item.rate).toFixed(2)}</td>
+                            <td className="px-4 py-2 text-sm text-center">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => deleteLaborMutation.mutate(item.id)}
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                        {(!labor || labor.length === 0) && (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-3 text-center text-sm text-muted-foreground">
+                              No hay registros de mano de obra
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-muted/50">
+                          <td colSpan={3} className="px-4 py-2 text-right text-sm font-medium">Total Mano de Obra:</td>
+                          <td className="px-4 py-2 text-right text-sm font-medium">${laborTotal.toFixed(2)}</td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
                 </div>
                 
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-muted text-muted-foreground text-sm">
-                      <th className="p-2 text-left">Repuesto</th>
-                      <th className="p-2 text-right">Cantidad</th>
-                      <th className="p-2 text-right">Precio unitario</th>
-                      <th className="p-2 text-right">Subtotal</th>
-                      <th className="p-2 text-center">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {parts?.map((part) => (
-                      <tr key={part.id} className="border-b border-muted">
-                        <td className="p-2">{part.description}</td>
-                        <td className="p-2 text-right">{part.quantity}</td>
-                        <td className="p-2 text-right">${part.unit_price.toFixed(2)}</td>
-                        <td className="p-2 text-right">${(part.quantity * part.unit_price).toFixed(2)}</td>
-                        <td className="p-2 text-center">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => deletePartMutation.mutate(part.id)}
-                          >
-                            <Trash className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                    {(!parts || parts.length === 0) && (
-                      <tr>
-                        <td colSpan={5} className="p-2 text-center text-muted-foreground">
-                          No hay repuestos registrados
-                        </td>
-                      </tr>
-                    )}
-                    <tr>
-                      <td colSpan={3} className="p-2 text-right font-medium">Total Repuestos:</td>
-                      <td className="p-2 text-right font-medium">${partsTotal.toFixed(2)}</td>
-                      <td></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium">Repuestos utilizados</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4 bg-muted/30 p-3 rounded-md">
+                    <div className="md:col-span-2">
+                      <Input 
+                        placeholder="Descripción del repuesto" 
+                        value={newPart.description}
+                        onChange={(e) => setNewPart({...newPart, description: e.target.value})}
+                        className="transition-all"
+                      />
+                    </div>
+                    <div>
+                      <Input 
+                        type="number" 
+                        placeholder="Cantidad" 
+                        min="1"
+                        value={newPart.quantity}
+                        onChange={(e) => setNewPart({...newPart, quantity: parseInt(e.target.value)})}
+                        className="transition-all"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Input 
+                        type="number" 
+                        placeholder="Precio $" 
+                        min="0.01"
+                        step="0.01"
+                        value={newPart.unit_price}
+                        onChange={(e) => setNewPart({...newPart, unit_price: parseFloat(e.target.value)})}
+                        className="transition-all"
+                      />
+                      <Button size="icon" onClick={handleAddPart} className="shrink-0">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="rounded-md border overflow-hidden">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-muted">
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Repuesto</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Cantidad</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Precio unitario</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Subtotal</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-muted-foreground w-16">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {parts?.map((part) => (
+                          <tr key={part.id} className="bg-card">
+                            <td className="px-4 py-2 text-sm">{part.description}</td>
+                            <td className="px-4 py-2 text-sm text-right">{part.quantity}</td>
+                            <td className="px-4 py-2 text-sm text-right">${part.unit_price.toFixed(2)}</td>
+                            <td className="px-4 py-2 text-sm text-right">${(part.quantity * part.unit_price).toFixed(2)}</td>
+                            <td className="px-4 py-2 text-sm text-center">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => deletePartMutation.mutate(part.id)}
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                        {(!parts || parts.length === 0) && (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-3 text-center text-sm text-muted-foreground">
+                              No hay repuestos registrados
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-muted/50">
+                          <td colSpan={3} className="px-4 py-2 text-right text-sm font-medium">Total Repuestos:</td>
+                          <td className="px-4 py-2 text-right text-sm font-medium">${partsTotal.toFixed(2)}</td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         </TabsContent>
 
-        <TabsContent value="payment" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pago y Facturación</CardTitle>
-              <CardDescription>Detalle del cobro por el servicio</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="bg-muted p-4 rounded-lg">
-                <h3 className="text-lg font-medium mb-4">Resumen</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>Mano de obra:</span>
-                    <span>${laborTotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Repuestos:</span>
-                    <span>${partsTotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>${subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>IVA (16%):</span>
-                    <span>${tax.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                    <span>Total:</span>
-                    <span>${total.toFixed(2)}</span>
+        <TabsContent value="payment">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card>
+              <CardHeader className="bg-muted/50">
+                <CardTitle>Pago y Facturación</CardTitle>
+                <CardDescription>Detalle del cobro por el servicio</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                <div className="bg-card p-5 rounded-lg border">
+                  <h3 className="text-lg font-medium mb-4">Resumen</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-muted-foreground">Mano de obra:</span>
+                      <span className="font-medium">${laborTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-muted-foreground">Repuestos:</span>
+                      <span className="font-medium">${partsTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-muted-foreground">Subtotal:</span>
+                      <span className="font-medium">${subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-muted-foreground">IVA (16%):</span>
+                      <span className="font-medium">${tax.toFixed(2)}</span>
+                    </div>
+                    <div className="h-px w-full bg-border my-2"></div>
+                    <div className="flex justify-between items-center py-1">
+                      <span className="font-medium text-lg">Total:</span>
+                      <span className="font-bold text-lg">${total.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="paymentMethod">Método de pago</Label>
-                  <Select defaultValue="Efectivo">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccione método" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Efectivo">Efectivo</SelectItem>
-                      <SelectItem value="Tarjeta de crédito">Tarjeta de crédito</SelectItem>
-                      <SelectItem value="Transferencia">Transferencia</SelectItem>
-                    </SelectContent>
-                  </Select>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentMethod" className="text-sm">Método de pago</Label>
+                    <Select defaultValue="Efectivo">
+                      <SelectTrigger className="w-full transition-all">
+                        <SelectValue placeholder="Seleccione método" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Efectivo">Efectivo</SelectItem>
+                        <SelectItem value="Tarjeta de crédito">Tarjeta de crédito</SelectItem>
+                        <SelectItem value="Transferencia">Transferencia</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentStatus" className="text-sm">Estado del pago</Label>
+                    <Select defaultValue="Pendiente">
+                      <SelectTrigger className="w-full transition-all">
+                        <SelectValue placeholder="Seleccione estado" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Pendiente">Pendiente</SelectItem>
+                        <SelectItem value="Completado">Completado</SelectItem>
+                        <SelectItem value="Cancelado">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+                
                 <div className="space-y-2">
-                  <Label htmlFor="paymentStatus">Estado del pago</Label>
-                  <Select defaultValue="Pendiente">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccione estado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Pendiente">Pendiente</SelectItem>
-                      <SelectItem value="Completado">Completado</SelectItem>
-                      <SelectItem value="Cancelado">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="invoiceNotes" className="text-sm">Notas para facturación</Label>
+                  <Textarea 
+                    id="invoiceNotes" 
+                    placeholder="Ingrese información adicional para la factura" 
+                    className="h-24 resize-none transition-all"
+                  />
                 </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="invoiceNotes">Notas para facturación</Label>
-                <Textarea id="invoiceNotes" placeholder="Ingrese información adicional para la factura" className="h-24" />
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button variant="outline">Generar factura</Button>
-              <Button>Guardar cambios</Button>
-            </CardFooter>
-          </Card>
+              </CardContent>
+              <CardFooter className="bg-muted/30 py-3 flex justify-between flex-wrap gap-2">
+                <Button variant="outline">Generar factura</Button>
+                <Button>Guardar cambios</Button>
+              </CardFooter>
+            </Card>
+          </motion.div>
         </TabsContent>
       </Tabs>
     </div>

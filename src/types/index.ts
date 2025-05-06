@@ -1,5 +1,6 @@
 
 export interface Client {
+  legal_id: string;
   id: string;
   name: string;
   email: string | null;
