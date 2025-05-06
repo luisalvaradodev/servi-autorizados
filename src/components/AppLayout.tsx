@@ -27,7 +27,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
       <div className="flex min-h-screen w-full bg-background">
         <Sidebar
           className="border-r border-notion-border"
-          onCollapseChange={setIsCollapsed}
         >
           <SidebarHeader className="border-b border-notion-border p-4">
             <div className="flex items-center">
@@ -40,7 +39,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 )}
               </div>
               <SidebarTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full">
+                <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setIsCollapsed(!isCollapsed)}>
                   {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
                 </Button>
               </SidebarTrigger>

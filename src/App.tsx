@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import AppLayout from "./components/AppLayout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import OrdersList from "./pages/OrdersList";
@@ -24,26 +25,28 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Login />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          
+          {/* Protected routes within AppLayout */}
+          <Route path="/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
           
           {/* Rutas de órdenes de servicio */}
-          <Route path="/orders" element={<OrdersList />} />
-          <Route path="/orders/new" element={<OrderForm />} />
-          <Route path="/orders/:id" element={<OrderDetail />} />
-          <Route path="/orders/:id/edit" element={<OrderForm />} />
-          <Route path="/orders/:id/print" element={<OrderPrint />} />
+          <Route path="/orders" element={<AppLayout><OrdersList /></AppLayout>} />
+          <Route path="/orders/new" element={<AppLayout><OrderForm /></AppLayout>} />
+          <Route path="/orders/:id" element={<AppLayout><OrderDetail /></AppLayout>} />
+          <Route path="/orders/:id/edit" element={<AppLayout><OrderForm /></AppLayout>} />
+          <Route path="/orders/:id/print" element={<AppLayout><OrderPrint /></AppLayout>} />
           
           {/* Rutas de clientes */}
-          <Route path="/clients" element={<ClientsList />} />
-          <Route path="/clients/new" element={<OrderForm />} />
-          <Route path="/clients/:id" element={<OrderDetail />} />
-          <Route path="/clients/:id/edit" element={<OrderForm />} />
+          <Route path="/clients" element={<AppLayout><ClientsList /></AppLayout>} />
+          <Route path="/clients/new" element={<AppLayout><OrderForm /></AppLayout>} />
+          <Route path="/clients/:id" element={<AppLayout><OrderDetail /></AppLayout>} />
+          <Route path="/clients/:id/edit" element={<AppLayout><OrderForm /></AppLayout>} />
           
           {/* Rutas de agenda */}
-          <Route path="/schedule" element={<Schedule />} />
+          <Route path="/schedule" element={<AppLayout><Schedule /></AppLayout>} />
           
           {/* Otras rutas */}
-          <Route path="/settings" element={<Dashboard />} />
+          <Route path="/settings" element={<AppLayout><Dashboard /></AppLayout>} />
           
           {/* Redirección y 404 */}
           <Route path="/index" element={<Navigate to="/" replace />} />
